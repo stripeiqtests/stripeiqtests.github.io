@@ -1,0 +1,202 @@
+import React, { createContext, useContext, useState } from 'react';
+
+type Language = 'ru' | 'en';
+
+interface LanguageContextType {
+    lang: Language;
+    setLang: (lang: Language) => void;
+    t: (key: string) => string;
+}
+
+const translations = {
+    ru: {
+        // Home page
+        'home.title': 'IQ Тесты',
+        'home.subtitle': 'Проверьте свои когнитивные способности',
+        'home.available_tests': 'Доступные тесты',
+        'home.no_tests': 'Тестов пока нет',
+        'home.check_later': 'Загляните позже.',
+        'home.questions': 'вопросов',
+        'home.start_test': 'Начать тест',
+
+        // Test page
+        'test.question': 'Вопрос',
+        'test.of': 'из',
+        'test.next': 'Далее',
+        'test.finish': 'Завершить',
+        'test.loading': 'Загрузка...',
+        'test.not_found': 'Тест не найден',
+        'test.no_questions': 'Вопросы не найдены',
+        'test.enter_email': 'Введите ваш email для получения результатов',
+        'test.email_placeholder': 'your@email.com',
+        'test.submit_results': 'Отправить результаты',
+
+        // Results page
+        'results.title': 'Результаты IQ теста',
+        'results.overall_score': 'ОБЩИЙ БАЛЛ',
+        'results.analyst': 'Аналитик',
+        'results.analyst_desc': 'Логическое мышление, анализ данных',
+        'results.strategist': 'Стратег',
+        'results.strategist_desc': 'Планирование, оптимизация',
+        'results.observer': 'Наблюдатель',
+        'results.observer_desc': 'Визуальное восприятие, пространственное мышление',
+        'results.intuitive': 'Интуит',
+        'results.intuitive_desc': 'Креативность, ассоциативное мышление',
+        'results.profile': 'Ваш когнитивный профиль',
+        'results.email_sent': 'Копия результатов отправлена на',
+        'results.take_another': 'Пройти другой тест',
+        'results.unlock': 'Разблокировать результаты',
+        'results.includes': 'В результаты входят:',
+        'results.includes_score': 'Общий IQ балл',
+        'results.includes_dimensions': '4 измерения анализа',
+        'results.includes_analysis': 'Персональный анализ',
+        'results.includes_career': 'Рекомендации по карьере',
+        'results.includes_email': 'Копия на email',
+
+        // Payment
+        'payment.unlock_results': 'Разблокировать результаты',
+        'payment.processing': 'Обработка...',
+        'payment.success': 'Оплата прошла успешно!',
+        'payment.verifying': 'Проверяем оплату...',
+        'payment.failed': 'Ошибка оплаты',
+
+        // Common
+        'common.loading': 'Загрузка...',
+        'common.error': 'Ошибка',
+        'common.back': 'Назад',
+
+        // Score interpretations
+        'score.excellent': 'Отлично! Ваши способности высокоразвиты.',
+        'score.good': 'Хороший результат! Ваши способности выше среднего.',
+        'score.average': 'Средний результат. Есть потенциал для развития.',
+        'score.improve': 'Есть возможности для улучшения.',
+
+        // Profile descriptions
+        'profile.analyst': 'Вы превосходно справляетесь с логическими задачами и анализом данных. Карьера в аналитике, программировании и науке вам подходит.',
+        'profile.strategist': 'Вы умеете планировать наперёд и видеть общую картину. Лидерство и управление проектами — ваши сильные стороны.',
+        'profile.observer': 'У вас отличное пространственное мышление и внимание к деталям. Дизайн, архитектура и инженерия вам подходят.',
+        'profile.intuitive': 'Ваше творческое мышление позволяет находить нестандартные решения. Творческие профессии и инновации — ваше призвание.',
+    },
+    en: {
+        // Home page
+        'home.title': 'IQ Tests',
+        'home.subtitle': 'Test your cognitive abilities',
+        'home.available_tests': 'Available Tests',
+        'home.no_tests': 'No tests available',
+        'home.check_later': 'Check back later.',
+        'home.questions': 'questions',
+        'home.start_test': 'Start Test',
+
+        // Test page
+        'test.question': 'Question',
+        'test.of': 'of',
+        'test.next': 'Next',
+        'test.finish': 'Finish',
+        'test.loading': 'Loading...',
+        'test.not_found': 'Test not found',
+        'test.no_questions': 'No questions found',
+        'test.enter_email': 'Enter your email to receive results',
+        'test.email_placeholder': 'your@email.com',
+        'test.submit_results': 'Submit Results',
+
+        // Results page
+        'results.title': 'Your IQ Test Results',
+        'results.overall_score': 'OVERALL SCORE',
+        'results.analyst': 'Analyst',
+        'results.analyst_desc': 'Logical thinking, data analysis',
+        'results.strategist': 'Strategist',
+        'results.strategist_desc': 'Planning, optimization',
+        'results.observer': 'Observer',
+        'results.observer_desc': 'Visual perception, spatial thinking',
+        'results.intuitive': 'Intuitive',
+        'results.intuitive_desc': 'Creativity, associative thinking',
+        'results.profile': 'Your Cognitive Profile',
+        'results.email_sent': 'A copy of these results has been sent to',
+        'results.take_another': 'Take Another Test',
+        'results.unlock': 'Unlock Your Results',
+        'results.includes': 'Your Results Include:',
+        'results.includes_score': 'Overall IQ Score',
+        'results.includes_dimensions': '4 Dimension Breakdown',
+        'results.includes_analysis': 'Personalized Analysis',
+        'results.includes_career': 'Career Recommendations',
+        'results.includes_email': 'Email Copy of Results',
+
+        // Payment
+        'payment.unlock_results': 'Unlock Results',
+        'payment.processing': 'Processing...',
+        'payment.success': 'Payment Successful!',
+        'payment.verifying': 'Verifying payment...',
+        'payment.failed': 'Payment failed',
+
+        // Common
+        'common.loading': 'Loading...',
+        'common.error': 'Error',
+        'common.back': 'Back',
+
+        // Score interpretations
+        'score.excellent': 'Excellent! Your abilities are highly developed.',
+        'score.good': 'Good result! Your abilities are above average.',
+        'score.average': 'Average result. There is potential for development.',
+        'score.improve': 'There are opportunities for improvement.',
+
+        // Profile descriptions
+        'profile.analyst': 'You excel at logical tasks and data analysis. Careers in analytics, programming, and science suit you well.',
+        'profile.strategist': 'You are skilled at planning ahead and seeing the big picture. Leadership and project management are your strengths.',
+        'profile.observer': 'You have excellent spatial thinking and attention to detail. Design, architecture, and engineering suit you.',
+        'profile.intuitive': 'Your creative thinking allows you to find unconventional solutions. Creative professions and innovation are your calling.',
+    },
+};
+
+const LanguageContext = createContext<LanguageContextType | null>(null);
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+    const [lang, setLangState] = useState<Language>(() => {
+        const saved = localStorage.getItem('lang');
+        return (saved === 'en' || saved === 'ru') ? saved : 'ru';
+    });
+
+    const setLang = (newLang: Language) => {
+        setLangState(newLang);
+        localStorage.setItem('lang', newLang);
+    };
+
+    const t = (key: string): string => {
+        return translations[lang][key as keyof typeof translations['ru']] || key;
+    };
+
+    return (
+        <LanguageContext.Provider value={{ lang, setLang, t }}>
+            {children}
+        </LanguageContext.Provider>
+    );
+}
+
+export function useLanguage() {
+    const context = useContext(LanguageContext);
+    if (!context) {
+        throw new Error('useLanguage must be used within LanguageProvider');
+    }
+    return context;
+}
+
+// Language switcher component
+export function LanguageSwitcher() {
+    const { lang, setLang } = useLanguage();
+
+    return (
+        <div className="language-switcher">
+            <button
+                className={`lang-btn ${lang === 'ru' ? 'active' : ''}`}
+                onClick={() => setLang('ru')}
+            >
+                RU
+            </button>
+            <button
+                className={`lang-btn ${lang === 'en' ? 'active' : ''}`}
+                onClick={() => setLang('en')}
+            >
+                EN
+            </button>
+        </div>
+    );
+}
