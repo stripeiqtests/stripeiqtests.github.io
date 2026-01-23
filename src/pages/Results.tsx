@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { TestSession, Test } from '../lib/supabase';
@@ -228,7 +229,7 @@ export function Results() {
             {Math.round(session.overall_score || 0)}
           </div>
           <p className="text-gray-600">
-            {getScoreInterpretation(session.overall_score || 0, lang)}
+            {useMemo(() => getScoreInterpretation(session.overall_score || 0, lang), [session.overall_score, lang])}
           </p>
         </div>
 
@@ -292,7 +293,7 @@ export function Results() {
   );
 }
 
-function DimensionCard({
+const DimensionCard = React.memo(function DimensionCard({
   title,
   score,
   color,
@@ -329,16 +330,16 @@ function DimensionCard({
       <div className="mt-3 h-2 bg-white rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${color === 'blue' ? 'bg-blue-500' :
-              color === 'purple' ? 'bg-purple-500' :
-                color === 'green' ? 'bg-green-500' :
-                  'bg-yellow-500'
+            color === 'purple' ? 'bg-purple-500' :
+              color === 'green' ? 'bg-green-500' :
+                'bg-yellow-500'
             }`}
           style={{ width: `${score}%` }}
         />
       </div>
     </div>
   );
-}
+});
 
 function getScoreInterpretation(score: number, lang: string): string {
   if (lang === 'ru') {

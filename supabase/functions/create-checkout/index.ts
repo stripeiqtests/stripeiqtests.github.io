@@ -19,6 +19,14 @@ serve(async (req) => {
   try {
     const { sessionId, testId, priceInCents, email } = await req.json();
 
+    // Input validation
+    if (!sessionId || typeof sessionId !== 'string') {
+      throw new Error('Invalid or missing sessionId');
+    }
+    if (!testId || typeof testId !== 'string') {
+      throw new Error('Invalid or missing testId');
+    }
+
     // Get the origin for redirect URLs
     const origin = req.headers.get('origin') || 'https://stripeiqtests.github.io';
 
@@ -57,7 +65,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Checkout error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

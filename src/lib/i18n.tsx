@@ -64,6 +64,12 @@ const translations = {
         'common.loading': 'Загрузка...',
         'common.error': 'Ошибка',
         'common.back': 'Назад',
+        'common.cancel': 'Отмена',
+        'common.submit': 'Отправить',
+        'common.get_results': 'Получить результаты',
+        'common.email_optional': 'Email (опционально)',
+        'common.email_hint': 'Мы отправим результаты на этот email после оплаты',
+        'common.submit_error': 'Ошибка отправки. Попробуйте еще раз.',
 
         // Score interpretations
         'score.excellent': 'Отлично! Ваши способности высокоразвиты.',
@@ -132,6 +138,12 @@ const translations = {
         'common.loading': 'Loading...',
         'common.error': 'Error',
         'common.back': 'Back',
+        'common.cancel': 'Cancel',
+        'common.submit': 'Submit',
+        'common.get_results': 'Get Results',
+        'common.email_optional': 'Email (optional)',
+        'common.email_hint': "We'll send your results to this email after payment",
+        'common.submit_error': 'Failed to submit. Please try again.',
 
         // Score interpretations
         'score.excellent': 'Excellent! Your abilities are highly developed.',

@@ -46,7 +46,7 @@ serve(async (req) => {
 
     // Get the service key
     const serviceKey = Deno.env.get('SERVICE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const supabaseUrl = 'https://movuagoqspojzshirvuz.supabase.co';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://movuagoqspojzshirvuz.supabase.co';
 
     if (!serviceKey) {
       throw new Error('No service key available');

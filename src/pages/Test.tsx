@@ -18,6 +18,7 @@ export function Test() {
   const [showEmailPrompt, setShowEmailPrompt] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (slug) {
@@ -84,7 +85,7 @@ export function Test() {
       .single();
 
     if (sessionError || !session) {
-      alert('Failed to submit test. Please try again.');
+      setSubmitError(t('common.submit_error'));
       setSubmitting(false);
       return;
     }
@@ -170,7 +171,7 @@ export function Test() {
 
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              {lang === 'ru' ? 'Email (опционально)' : 'Email (optional)'}
+              {t('common.email_optional')}
             </label>
             <input
               type="email"
@@ -180,9 +181,15 @@ export function Test() {
               className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <p className="text-xs text-gray-400 mt-2">
-              {lang === 'ru' ? 'Мы отправим результаты на этот email после оплаты' : "We'll send your results to this email after payment"}
+              {t('common.email_hint')}
             </p>
           </div>
+
+          {submitError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {submitError}
+            </div>
+          )}
 
           <button
             onClick={handleSubmit}
