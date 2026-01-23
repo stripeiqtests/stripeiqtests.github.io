@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { TestSession, Test } from '../lib/supabase';
@@ -14,17 +13,6 @@ export function Results() {
   const [test, setTest] = useState<Test | null>(null);
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
-
-  // Memoized calculations
-  const scoreInterpretation = useMemo(
-    () => session ? getScoreInterpretation(session.overall_score || 0, lang) : '',
-    [session?.overall_score, lang]
-  );
-
-  const profileDescription = useMemo(
-    () => session ? getProfileDescription(session, lang) : '',
-    [session, lang]
-  );
 
   useEffect(() => {
     if (sessionId) {
@@ -240,7 +228,7 @@ export function Results() {
             {Math.round(session.overall_score || 0)}
           </div>
           <p className="text-gray-600">
-            {scoreInterpretation}
+            {getScoreInterpretation(session.overall_score || 0, lang)}
           </p>
         </div>
 
@@ -276,7 +264,7 @@ export function Results() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('results.profile')}</h3>
           <p className="text-gray-600 leading-relaxed">
-            {profileDescription}
+            {getProfileDescription(session, lang)}
           </p>
         </div>
 
@@ -304,7 +292,7 @@ export function Results() {
   );
 }
 
-const DimensionCard = React.memo(function DimensionCard({
+function DimensionCard({
   title,
   score,
   color,
@@ -350,7 +338,7 @@ const DimensionCard = React.memo(function DimensionCard({
       </div>
     </div>
   );
-});
+}
 
 function getScoreInterpretation(score: number, lang: string): string {
   if (lang === 'ru') {
