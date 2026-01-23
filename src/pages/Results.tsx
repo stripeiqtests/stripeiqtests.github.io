@@ -15,6 +15,17 @@ export function Results() {
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
 
+  // Memoized calculations
+  const scoreInterpretation = useMemo(
+    () => session ? getScoreInterpretation(session.overall_score || 0, lang) : '',
+    [session?.overall_score, lang]
+  );
+
+  const profileDescription = useMemo(
+    () => session ? getProfileDescription(session, lang) : '',
+    [session, lang]
+  );
+
   useEffect(() => {
     if (sessionId) {
       loadSession();
@@ -229,7 +240,7 @@ export function Results() {
             {Math.round(session.overall_score || 0)}
           </div>
           <p className="text-gray-600">
-            {useMemo(() => getScoreInterpretation(session.overall_score || 0, lang), [session.overall_score, lang])}
+            {scoreInterpretation}
           </p>
         </div>
 
@@ -265,7 +276,7 @@ export function Results() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('results.profile')}</h3>
           <p className="text-gray-600 leading-relaxed">
-            {getProfileDescription(session, lang)}
+            {profileDescription}
           </p>
         </div>
 
