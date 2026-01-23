@@ -21,7 +21,6 @@ serve(async (req) => {
 
     // Get the origin for redirect URLs
     const origin = req.headers.get('origin') || 'https://stripeiqtests.github.io';
-    const basePath = '/iq-tests'; // GitHub Pages base path
 
     // Create Stripe checkout session
     const checkoutSession = await stripe.checkout.sessions.create({
@@ -39,8 +38,8 @@ serve(async (req) => {
           quantity: 1,
         },
       ],
-      success_url: `${origin}${basePath}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}${basePath}/payment/cancel?session_id=${sessionId}`,
+      success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/payment/cancel?session_id=${sessionId}`,
       customer_email: email || undefined,
       metadata: {
         testSessionId: sessionId,

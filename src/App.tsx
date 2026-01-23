@@ -10,7 +10,7 @@ import { LanguageProvider } from './lib/i18n';
 function App() {
   return (
     <LanguageProvider>
-      <BrowserRouter basename="/iq-tests">
+      <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/admin" element={<Admin />} />
