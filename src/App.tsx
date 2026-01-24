@@ -5,6 +5,7 @@ import { Test } from './pages/Test';
 import { PaymentSuccess } from './pages/PaymentSuccess';
 import { PaymentCancel } from './pages/PaymentCancel';
 import { LanguageProvider } from './lib/i18n';
+import { AdminProvider } from './lib/AdminContext';
 
 // Lazy load heavy components
 const Admin = lazy(() => import('./pages/Admin').then(m => ({ default: m.Admin })));
@@ -24,20 +25,22 @@ function LoadingSpinner() {
 
 function App() {
   return (
-    <LanguageProvider>
-      <BrowserRouter>
-        <Suspense fallback={<LoadingSpinner />}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/:slug" element={<Test />} />
-            <Route path="/results/:sessionId" element={<Results />} />
-            <Route path="/payment/success" element={<PaymentSuccess />} />
-            <Route path="/payment/cancel" element={<PaymentCancel />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </LanguageProvider>
+    <AdminProvider>
+      <LanguageProvider>
+        <BrowserRouter>
+          <Suspense fallback={<LoadingSpinner />}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/admin" element={<Admin />} />
+              <Route path="/:slug" element={<Test />} />
+              <Route path="/results/:sessionId" element={<Results />} />
+              <Route path="/payment/success" element={<PaymentSuccess />} />
+              <Route path="/payment/cancel" element={<PaymentCancel />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </LanguageProvider>
+    </AdminProvider>
   );
 }
 

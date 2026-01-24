@@ -5,11 +5,15 @@ import type { Test, Question } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import {
   Brain, Lock, Plus, Edit2, Trash2, Save, X,
-  Eye, EyeOff, ChevronDown, ChevronUp, ArrowLeft
+  Eye, EyeOff, ChevronDown, ChevronUp, ArrowLeft, FileText, Settings
 } from 'lucide-react';
+import { useAdmin } from '../lib/AdminContext';
+import { PageContentEditor } from '../components/PageContentEditor';
+import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 
 export function Admin() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAdmin, setIsAdmin, logout } = useAdmin();
+  const { t } = useLanguage();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,15 +28,14 @@ export function Admin() {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [newTest, setNewTest] = useState(false);
   const [newQuestion, setNewQuestion] = useState<string | null>(null); // test_id for new question
+  const [activeTab, setActiveTab] = useState<'tests' | 'content'>('tests');
 
   useEffect(() => {
-    // Check if already authenticated (session storage)
-    const auth = sessionStorage.getItem('admin_auth');
-    if (auth === 'true') {
-      setIsAuthenticated(true);
+    // Load tests if already authenticated
+    if (isAdmin) {
       loadTests();
     }
-  }, []);
+  }, [isAdmin]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -53,7 +56,7 @@ export function Admin() {
     }
 
     if (data.value === password) {
-      setIsAuthenticated(true);
+      setIsAdmin(true);
       sessionStorage.setItem('admin_auth', 'true');
       loadTests();
     } else {
@@ -209,7 +212,7 @@ export function Admin() {
   }
 
   // Login form
-  if (!isAuthenticated) {
+  if (!isAdmin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
@@ -248,7 +251,7 @@ export function Admin() {
             to="/"
             className="block text-center mt-6 text-sm text-gray-500 hover:text-gray-700"
           >
-            ← Back to Home
+            {t('admin.back_home')}
           </Link>
         </div>
       </div>
@@ -267,197 +270,235 @@ export function Admin() {
             </Link>
             <div className="flex items-center gap-2">
               <Brain className="w-6 h-6 text-indigo-600" />
-              <span className="font-bold text-gray-900">Admin Panel</span>
+              <span className="font-bold text-gray-900">{t('admin.panel')}</span>
             </div>
           </div>
-          <button
-            onClick={() => {
-              sessionStorage.removeItem('admin_auth');
-              setIsAuthenticated(false);
-            }}
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-4">
+            <LanguageSwitcher />
+            <button
+              onClick={() => {
+                logout();
+              }}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              {t('admin.logout')}
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Tests Section */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-900">Manage Tests</h2>
+        {/* Tabs */}
+        <div className="flex gap-4 mb-6 border-b border-gray-200">
           <button
-            onClick={() => setNewTest(true)}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+            onClick={() => setActiveTab('tests')}
+            className={`pb-3 px-1 font-medium transition-colors relative ${activeTab === 'tests'
+              ? 'text-indigo-600 border-b-2 border-indigo-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
           >
-            <Plus className="w-4 h-4" />
-            New Test
+            <span className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              {t('admin.manage_tests')}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('content')}
+            className={`pb-3 px-1 font-medium transition-colors relative ${activeTab === 'content'
+              ? 'text-indigo-600 border-b-2 border-indigo-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            <span className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              {t('admin.page_content')}
+            </span>
           </button>
         </div>
 
-        {/* New Test Form */}
-        {newTest && (
-          <TestForm
-            onSave={(test) => saveTest(test)}
-            onCancel={() => setNewTest(false)}
-          />
-        )}
+        {/* Page Content Tab */}
+        {activeTab === 'content' && <PageContentEditor />}
 
-        {/* Tests List */}
-        <div className="space-y-4">
-          {tests.map((test) => (
-            <div key={test.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              {/* Test Header */}
-              {editingTest?.id === test.id ? (
-                <TestForm
-                  test={test}
-                  onSave={(t) => saveTest(t)}
-                  onCancel={() => setEditingTest(null)}
-                />
-              ) : (
-                <div className="p-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-semibold text-gray-900">{test.title}</h3>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${test.is_active
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-500'
-                          }`}>
-                          {test.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                      <p className="text-gray-500 text-sm mt-1">{test.description}</p>
-                      <p className="text-sm text-gray-600 mt-2">
-                        Price: <span className="font-semibold">${(test.price_cents / 100).toFixed(2)}</span>
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => toggleTestActive(test)}
-                        className={`p-2 rounded-lg transition-colors ${test.is_active
-                            ? 'text-green-600 hover:bg-green-50'
-                            : 'text-gray-400 hover:bg-gray-50'
-                          }`}
-                        title={test.is_active ? 'Deactivate' : 'Activate'}
-                      >
-                        {test.is_active ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-                      </button>
-                      <button
-                        onClick={() => setEditingTest(test)}
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                      >
-                        <Edit2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => deleteTest(test.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleExpandTest(test.id)}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                      >
-                        {expandedTest === test.id ? (
-                          <ChevronUp className="w-5 h-5" />
-                        ) : (
-                          <ChevronDown className="w-5 h-5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+        {/* Tests Tab */}
+        {activeTab === 'tests' && (
+          <>
+            {/* Tests Section */}
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">{t('admin.manage_tests')}</h2>
+              <button
+                onClick={() => setNewTest(true)}
+                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                {t('admin.new_test')}
+              </button>
+            </div>
 
-              {/* Questions Section */}
-              {expandedTest === test.id && (
-                <div className="border-t border-gray-200 bg-gray-50 p-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-medium text-gray-700">Questions ({questions[test.id]?.length || 0})</h4>
-                    <button
-                      onClick={() => setNewQuestion(test.id)}
-                      className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add Question
-                    </button>
-                  </div>
+            {/* New Test Form */}
+            {newTest && (
+              <TestForm
+                onSave={(test) => saveTest(test)}
+                onCancel={() => setNewTest(false)}
+              />
+            )}
 
-                  {/* New Question Form */}
-                  {newQuestion === test.id && (
-                    <QuestionForm
-                      questionNumber={(questions[test.id]?.length || 0) + 1}
-                      onSave={(q) => saveQuestion(q, test.id)}
-                      onCancel={() => setNewQuestion(null)}
+            {/* Tests List */}
+            <div className="space-y-4">
+              {tests.map((test) => (
+                <div key={test.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  {/* Test Header */}
+                  {editingTest?.id === test.id ? (
+                    <TestForm
+                      test={test}
+                      onSave={(t) => saveTest(t)}
+                      onCancel={() => setEditingTest(null)}
                     />
+                  ) : (
+                    <div className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-lg font-semibold text-gray-900">{test.title}</h3>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${test.is_active
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-500'
+                              }`}>
+                              {test.is_active ? t('admin.active') : t('admin.inactive')}
+                            </span>
+                          </div>
+                          <p className="text-gray-500 text-sm mt-1">{test.description}</p>
+                          <p className="text-sm text-gray-600 mt-2">
+                            {t('admin.price')}: <span className="font-semibold">${(test.price_cents / 100).toFixed(2)}</span>
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => toggleTestActive(test)}
+                            className={`p-2 rounded-lg transition-colors ${test.is_active
+                              ? 'text-green-600 hover:bg-green-50'
+                              : 'text-gray-400 hover:bg-gray-50'
+                              }`}
+                            title={test.is_active ? t('admin.deactivate') : t('admin.activate')}
+                          >
+                            {test.is_active ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+                          </button>
+                          <button
+                            onClick={() => setEditingTest(test)}
+                            className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          >
+                            <Edit2 className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => deleteTest(test.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleExpandTest(test.id)}
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                          >
+                            {expandedTest === test.id ? (
+                              <ChevronUp className="w-5 h-5" />
+                            ) : (
+                              <ChevronDown className="w-5 h-5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   )}
 
-                  {/* Questions List */}
-                  <div className="space-y-2">
-                    {questions[test.id]?.map((question) => (
-                      <div key={question.id}>
-                        {editingQuestion?.id === question.id ? (
-                          <QuestionForm
-                            question={question}
-                            questionNumber={question.question_number}
-                            onSave={(q) => saveQuestion(q, test.id)}
-                            onCancel={() => setEditingQuestion(null)}
-                          />
-                        ) : (
-                          <div className="bg-white rounded-lg p-3 border border-gray-200 flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-500">#{question.question_number}</span>
-                                <span className={`px-2 py-0.5 rounded text-xs ${question.dimension === 'analyst' ? 'bg-blue-100 text-blue-700' :
-                                    question.dimension === 'strategist' ? 'bg-purple-100 text-purple-700' :
-                                      question.dimension === 'observer' ? 'bg-green-100 text-green-700' :
-                                        'bg-yellow-100 text-yellow-700'
-                                  }`}>
-                                  {question.dimension}
-                                </span>
-                              </div>
-                              <p className="text-sm text-gray-700 mt-1">{question.question_text}</p>
-                              {question.image_url && (
-                                <p className="text-xs text-gray-400 mt-1">Has image</p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => setEditingQuestion(question)}
-                                className="p-1.5 text-gray-400 hover:text-indigo-600 rounded"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => deleteQuestion(question.id, test.id)}
-                                className="p-1.5 text-gray-400 hover:text-red-600 rounded"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                  {/* Questions Section */}
+                  {expandedTest === test.id && (
+                    <div className="border-t border-gray-200 bg-gray-50 p-4">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-medium text-gray-700">{t('admin.questions')} ({questions[test.id]?.length || 0})</h4>
+                        <button
+                          onClick={() => setNewQuestion(test.id)}
+                          className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700"
+                        >
+                          <Plus className="w-4 h-4" />
+                          {t('admin.add_question')}
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
 
-        {tests.length === 0 && !newTest && (
-          <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-            <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">No tests created yet.</p>
-            <button
-              onClick={() => setNewTest(true)}
-              className="mt-4 text-indigo-600 hover:text-indigo-700 font-medium"
-            >
-              Create your first test
-            </button>
-          </div>
+                      {/* New Question Form */}
+                      {newQuestion === test.id && (
+                        <QuestionForm
+                          questionNumber={(questions[test.id]?.length || 0) + 1}
+                          onSave={(q) => saveQuestion(q, test.id)}
+                          onCancel={() => setNewQuestion(null)}
+                        />
+                      )}
+
+                      {/* Questions List */}
+                      <div className="space-y-2">
+                        {questions[test.id]?.map((question) => (
+                          <div key={question.id}>
+                            {editingQuestion?.id === question.id ? (
+                              <QuestionForm
+                                question={question}
+                                questionNumber={question.question_number}
+                                onSave={(q) => saveQuestion(q, test.id)}
+                                onCancel={() => setEditingQuestion(null)}
+                              />
+                            ) : (
+                              <div className="bg-white rounded-lg p-3 border border-gray-200 flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-gray-500">#{question.question_number}</span>
+                                    <span className={`px-2 py-0.5 rounded text-xs ${question.dimension === 'analyst' ? 'bg-blue-100 text-blue-700' :
+                                      question.dimension === 'strategist' ? 'bg-purple-100 text-purple-700' :
+                                        question.dimension === 'observer' ? 'bg-green-100 text-green-700' :
+                                          'bg-yellow-100 text-yellow-700'
+                                      }`}>
+                                      {question.dimension}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-700 mt-1">{question.question_text}</p>
+                                  {question.image_url && (
+                                    <p className="text-xs text-gray-400 mt-1">Has image</p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => setEditingQuestion(question)}
+                                    className="p-1.5 text-gray-400 hover:text-indigo-600 rounded"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => deleteQuestion(question.id, test.id)}
+                                    className="p-1.5 text-gray-400 hover:text-red-600 rounded"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {tests.length === 0 && !newTest && (
+              <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+                <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">{t('admin.no_tests')}</p>
+                <button
+                  onClick={() => setNewTest(true)}
+                  className="mt-4 text-indigo-600 hover:text-indigo-700 font-medium"
+                >
+                  {t('admin.create_first')}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
@@ -474,6 +515,7 @@ function TestForm({
   onSave: (test: Partial<Test>) => void;
   onCancel: () => void;
 }) {
+  const { t } = useLanguage();
   const [title, setTitle] = useState(test?.title || '');
   const [description, setDescription] = useState(test?.description || '');
   const [price, setPrice] = useState(test ? (test.price_cents / 100).toString() : '5');
@@ -485,18 +527,18 @@ function TestForm({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Test Title"
+          placeholder={t('admin.test_title')}
           className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Description"
+          placeholder={t('admin.test_description')}
           rows={2}
           className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Price: $</span>
+          <span className="text-sm text-gray-600">{t('admin.price')}: $</span>
           <input
             type="number"
             value={price}
@@ -525,7 +567,7 @@ function TestForm({
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
-          Save
+          {t('admin.save')}
         </button>
       </div>
     </div>
@@ -544,6 +586,7 @@ function QuestionForm({
   onSave: (question: Partial<Question>) => void;
   onCancel: () => void;
 }) {
+  const { t } = useLanguage();
   const [qNumber, setQNumber] = useState(question?.question_number || questionNumber);
   const [text, setText] = useState(question?.question_text || '');
   const [imageUrl, setImageUrl] = useState(question?.image_url || '');
@@ -562,7 +605,7 @@ function QuestionForm({
     <div className="bg-white p-4 rounded-lg border border-indigo-200 mb-2">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-gray-500">Question #</label>
+          <label className="text-xs text-gray-500">{t('admin.question_num')}</label>
           <input
             type="number"
             value={qNumber}
@@ -571,22 +614,22 @@ function QuestionForm({
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Dimension</label>
+          <label className="text-xs text-gray-500">{t('admin.dimension')}</label>
           <select
             value={dimension}
             onChange={(e) => setDimension(e.target.value as Question['dimension'])}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
           >
-            <option value="analyst">Analyst</option>
-            <option value="strategist">Strategist</option>
-            <option value="observer">Observer</option>
-            <option value="intuitive">Intuitive</option>
+            <option value="analyst">{t('admin.analyst')}</option>
+            <option value="strategist">{t('admin.strategist')}</option>
+            <option value="observer">{t('admin.observer')}</option>
+            <option value="intuitive">{t('admin.intuitive')}</option>
           </select>
         </div>
       </div>
 
       <div className="mt-3">
-        <label className="text-xs text-gray-500">Question Text</label>
+        <label className="text-xs text-gray-500">{t('admin.question_text')}</label>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -596,7 +639,7 @@ function QuestionForm({
       </div>
 
       <div className="mt-3">
-        <label className="text-xs text-gray-500">Image URL (optional)</label>
+        <label className="text-xs text-gray-500">{t('admin.image_url')}</label>
         <input
           type="text"
           value={imageUrl}
@@ -607,7 +650,7 @@ function QuestionForm({
       </div>
 
       <div className="mt-3">
-        <label className="text-xs text-gray-500">Options</label>
+        <label className="text-xs text-gray-500">{t('admin.options')}</label>
         <div className="space-y-2">
           {options.map((opt, idx) => (
             <div key={idx} className="flex items-center gap-2">
@@ -628,7 +671,7 @@ function QuestionForm({
       </div>
 
       <div className="mt-3">
-        <label className="text-xs text-gray-500">Correct Answer</label>
+        <label className="text-xs text-gray-500">{t('admin.correct_answer')}</label>
         <select
           value={correctAnswer}
           onChange={(e) => setCorrectAnswer(e.target.value)}
@@ -642,7 +685,7 @@ function QuestionForm({
 
       <div className="flex justify-end gap-2 mt-4">
         <button onClick={onCancel} className="px-3 py-1.5 text-gray-600 hover:text-gray-800 text-sm">
-          Cancel
+          {t('admin.cancel')}
         </button>
         <button
           onClick={() => onSave({
@@ -658,7 +701,7 @@ function QuestionForm({
           className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 disabled:opacity-50"
         >
           <Save className="w-3 h-3" />
-          Save
+          {t('admin.save')}
         </button>
       </div>
     </div>

@@ -49,3 +49,10 @@ export interface AppSettings {
   key: string;
   value: string;
 }
+
+export interface HomeContent {
+  id: string;
+  key: string;
+  value: string;
+  updated_at: string;
+}
