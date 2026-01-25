@@ -31,7 +31,7 @@ function App() {
           <Suspense fallback={<LoadingSpinner />}>
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/admin" element={<Admin />} />
+              <Route path="/admin/*" element={<Admin />} />
               <Route path="/:slug" element={<Test />} />
               <Route path="/results/:sessionId" element={<Results />} />
               <Route path="/payment/success" element={<PaymentSuccess />} />

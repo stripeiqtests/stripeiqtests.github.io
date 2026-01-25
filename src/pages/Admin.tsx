@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { generateSlug } from '../lib/utils';
 import type { Test, Question } from '../lib/supabase';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Brain, Lock, Plus, Edit2, Trash2, Save, X,
   Eye, EyeOff, ChevronDown, ChevronUp, ArrowLeft, FileText, Settings
@@ -28,7 +28,16 @@ export function Admin() {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [newTest, setNewTest] = useState(false);
   const [newQuestion, setNewQuestion] = useState<string | null>(null); // test_id for new question
-  const [activeTab, setActiveTab] = useState<'tests' | 'content'>('tests');
+  const location = useLocation();
+
+  // Determine active tab from URL
+  const getActiveTab = (): 'tests' | 'content' | 'pages' => {
+    const path = location.pathname;
+    if (path.includes('/admin/content')) return 'content';
+    if (path.includes('/admin/pages')) return 'pages';
+    return 'tests';
+  };
+  const activeTab = getActiveTab();
 
   useEffect(() => {
     // Load tests if already authenticated
@@ -290,8 +299,8 @@ export function Admin() {
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* Tabs */}
         <div className="flex gap-4 mb-6 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('tests')}
+          <Link
+            to="/admin/tests"
             className={`pb-3 px-1 font-medium transition-colors relative ${activeTab === 'tests'
               ? 'text-indigo-600 border-b-2 border-indigo-600'
               : 'text-gray-500 hover:text-gray-700'
@@ -301,9 +310,9 @@ export function Admin() {
               <Settings className="w-4 h-4" />
               {t('admin.manage_tests')}
             </span>
-          </button>
-          <button
-            onClick={() => setActiveTab('content')}
+          </Link>
+          <Link
+            to="/admin/content"
             className={`pb-3 px-1 font-medium transition-colors relative ${activeTab === 'content'
               ? 'text-indigo-600 border-b-2 border-indigo-600'
               : 'text-gray-500 hover:text-gray-700'
@@ -313,7 +322,19 @@ export function Admin() {
               <FileText className="w-4 h-4" />
               {t('admin.page_content')}
             </span>
-          </button>
+          </Link>
+          <Link
+            to="/admin/pages"
+            className={`pb-3 px-1 font-medium transition-colors relative ${activeTab === 'pages'
+              ? 'text-indigo-600 border-b-2 border-indigo-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            <span className="flex items-center gap-2">
+              <Eye className="w-4 h-4" />
+              {t('admin.view_pages')}
+            </span>
+          </Link>
         </div>
 
         {/* Page Content Tab */}
@@ -500,6 +521,77 @@ export function Admin() {
             )}
           </>
         )}
+
+        {/* Pages Tab - Quick access to view and edit pages */}
+        {activeTab === 'pages' && (
+          <div className="space-y-4">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">{t('admin.view_pages')}</h2>
+              <p className="text-gray-500 text-sm">{t('admin.view_pages_desc')}</p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Link
+                to="/"
+                target="_blank"
+                className="bg-white p-6 rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all group"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+                    <Brain className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900">{t('admin.home_page')}</h3>
+                </div>
+                <p className="text-sm text-gray-500">{t('admin.home_page_desc')}</p>
+              </Link>
+
+              <Link
+                to="/payment/success?session_id=demo"
+                target="_blank"
+                className="bg-white p-6 rounded-xl border border-gray-200 hover:border-green-300 hover:shadow-md transition-all group"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
+                    <Eye className="w-5 h-5 text-green-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900">{t('admin.payment_success')}</h3>
+                </div>
+                <p className="text-sm text-gray-500">{t('admin.payment_success_desc')}</p>
+              </Link>
+
+              <Link
+                to="/payment/cancel"
+                target="_blank"
+                className="bg-white p-6 rounded-xl border border-gray-200 hover:border-red-300 hover:shadow-md transition-all group"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
+                    <X className="w-5 h-5 text-red-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900">{t('admin.payment_cancel')}</h3>
+                </div>
+                <p className="text-sm text-gray-500">{t('admin.payment_cancel_desc')}</p>
+              </Link>
+
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  alert(t('admin.results_requires_session'));
+                }}
+                className="bg-white p-6 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                    <FileText className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900">{t('admin.results_page')}</h3>
+                </div>
+                <p className="text-sm text-gray-500">{t('admin.results_page_desc')}</p>
+              </a>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -590,14 +682,30 @@ function QuestionForm({
   const [qNumber, setQNumber] = useState(question?.question_number || questionNumber);
   const [text, setText] = useState(question?.question_text || '');
   const [imageUrl, setImageUrl] = useState(question?.image_url || '');
-  const [options, setOptions] = useState<{ label: string; value: string }[]>(
-    question?.options ? JSON.parse(question.options) : [
-      { label: 'A', value: '' },
-      { label: 'B', value: '' },
-      { label: 'C', value: '' },
-      { label: 'D', value: '' },
-    ]
-  );
+  const [options, setOptions] = useState<{ label: string; value: string }[]>(() => {
+    if (!question?.options) {
+      return [
+        { label: 'A', value: '' },
+        { label: 'B', value: '' },
+        { label: 'C', value: '' },
+        { label: 'D', value: '' },
+      ];
+    }
+    // Handle both string and already-parsed object
+    if (typeof question.options === 'string') {
+      try {
+        return JSON.parse(question.options);
+      } catch {
+        return [
+          { label: 'A', value: '' },
+          { label: 'B', value: '' },
+          { label: 'C', value: '' },
+          { label: 'D', value: '' },
+        ];
+      }
+    }
+    return question.options;
+  });
   const [correctAnswer, setCorrectAnswer] = useState(question?.correct_answer || 'A');
   const [dimension, setDimension] = useState<Question['dimension']>(question?.dimension || 'analyst');
 

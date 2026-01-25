@@ -3,6 +3,9 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CheckCircle } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
+import { useAdmin } from '../lib/AdminContext';
+import { EditableField } from '../components/EditableField';
+import type { HomeContent } from '../lib/supabase';
 
 export function PaymentSuccess() {
   const [searchParams] = useSearchParams();
@@ -10,15 +13,53 @@ export function PaymentSuccess() {
   const [processing, setProcessing] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { lang } = useLanguage();
+  const { isAdmin } = useAdmin();
+  const [content, setContent] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    loadContent();
+  }, [lang]);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
+    // Skip payment verification in demo mode for admin
+    if (sessionId === 'demo' && isAdmin) {
+      setProcessing(false);
+      return;
+    }
     if (sessionId) {
       handlePaymentSuccess(sessionId);
     } else {
       navigate('/');
     }
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, isAdmin]);
+
+  async function loadContent() {
+    const { data } = await supabase
+      .from('home_content')
+      .select('*')
+      .eq('language', lang);
+
+    if (data) {
+      const contentMap: Record<string, string> = {};
+      data.forEach((item: HomeContent) => {
+        contentMap[item.key] = item.value;
+      });
+      setContent(contentMap);
+    }
+  }
+
+  async function saveContent(key: string, value: string) {
+    const { error } = await supabase
+      .from('home_content')
+      .upsert({ key, value, language: lang }, { onConflict: 'key,language' });
+
+    if (!error) {
+      setContent(prev => ({ ...prev, [key]: value }));
+    }
+  }
+
+  const getContent = (key: string, fallback: string) => content[key] || fallback;
 
   async function handlePaymentSuccess(stripeSessionId: string) {
     try {
@@ -49,12 +90,55 @@ export function PaymentSuccess() {
     }
   }
 
+  const defaultTitle = lang === 'ru' ? 'Оплата прошла успешно!' : 'Payment Successful!';
+  const defaultProcessing = lang === 'ru' ? 'Обрабатываем ваши результаты...' : 'Processing your results...';
+  const defaultError = lang === 'ru' ? 'Что-то пошло не так. Свяжитесь с поддержкой.' : 'Something went wrong. Please contact support.';
+
+  // Demo mode for admin - show editable content
+  if (!processing && isAdmin && searchParams.get('session_id') === 'demo') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            <EditableField
+              value={getContent('payment_success_title', defaultTitle)}
+              onSave={(value) => saveContent('payment_success_title', value)}
+              as="span"
+              className="text-2xl font-bold text-gray-900"
+            />
+          </h1>
+          <p className="text-gray-500 mb-4">
+            <EditableField
+              value={getContent('payment_success_processing', defaultProcessing)}
+              onSave={(value) => saveContent('payment_success_processing', value)}
+              as="span"
+              className="text-gray-500"
+            />
+          </p>
+          <p className="text-sm text-indigo-600 bg-indigo-50 p-3 rounded-lg">
+            Admin mode: This is how the page appears during processing
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (!processing) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
           <p className="text-gray-500 mb-4">
-            {lang === 'ru' ? 'Что-то пошло не так. Свяжитесь с поддержкой.' : 'Something went wrong. Please contact support.'}
+            {isAdmin ? (
+              <EditableField
+                value={getContent('payment_success_error', defaultError)}
+                onSave={(value) => saveContent('payment_success_error', value)}
+                as="span"
+                className="text-gray-500"
+              />
+            ) : (
+              getContent('payment_success_error', defaultError)
+            )}
           </p>
           {errorMessage && (
             <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{errorMessage}</p>
@@ -69,10 +153,10 @@ export function PaymentSuccess() {
       <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          {lang === 'ru' ? 'Оплата прошла успешно!' : 'Payment Successful!'}
+          {getContent('payment_success_title', defaultTitle)}
         </h1>
         <p className="text-gray-500 mb-4">
-          {lang === 'ru' ? 'Обрабатываем ваши результаты...' : 'Processing your results...'}
+          {getContent('payment_success_processing', defaultProcessing)}
         </p>
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
       </div>
