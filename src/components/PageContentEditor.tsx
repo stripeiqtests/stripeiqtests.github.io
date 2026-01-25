@@ -148,10 +148,21 @@ const PAGE_SECTIONS = [
     { key: 'results', label: 'admin.results_page', Preview: ResultsPreview },
 ];
 
-export function PageContentEditor() {
+export function PageContentEditor({ pageType }: { pageType?: 'success' | 'cancel' | 'results' }) {
     const { t, lang } = useLanguage();
     const [content, setContent] = useState<Record<string, string>>({});
-    const [expandedPage, setExpandedPage] = useState<string | null>(null);
+
+    // Map pageType to section key
+    const pageTypeToKey: Record<string, string> = {
+        'success': 'payment_success',
+        'cancel': 'payment_cancel',
+        'results': 'results',
+    };
+
+    // If pageType is specified, show that section expanded by default
+    const [expandedPage, setExpandedPage] = useState<string | null>(
+        pageType ? pageTypeToKey[pageType] : null
+    );
 
     useEffect(() => {
         loadContent();
@@ -188,6 +199,24 @@ export function PageContentEditor() {
         setContent(prev => ({ ...prev, [key]: value }));
     }
 
+    // Filter sections if pageType is specified
+    const sectionsToShow = pageType
+        ? PAGE_SECTIONS.filter(s => s.key === pageTypeToKey[pageType])
+        : PAGE_SECTIONS;
+
+    // If showing single page, render just the preview without accordion
+    if (pageType && sectionsToShow.length === 1) {
+        const { Preview } = sectionsToShow[0];
+        return (
+            <div className="p-6">
+                <p className="text-sm text-gray-500 mb-4">
+                    {lang === 'ru' ? 'Нажмите на карандаш для редактирования текста' : 'Click pencil icons to edit text'}
+                </p>
+                <Preview content={content} saveContent={saveContent} />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center mb-6">
@@ -197,7 +226,7 @@ export function PageContentEditor() {
                 </p>
             </div>
 
-            {PAGE_SECTIONS.map(({ key, label, Preview }) => (
+            {sectionsToShow.map(({ key, label, Preview }) => (
                 <div key={key} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <button
                         onClick={() => setExpandedPage(expandedPage === key ? null : key)}
@@ -221,3 +250,4 @@ export function PageContentEditor() {
         </div>
     );
 }
+
