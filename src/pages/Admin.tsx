@@ -546,7 +546,7 @@ export function Admin() {
               </Link>
 
               <Link
-                to="/payment/success?session_id=demo"
+                to="/payment/success?preview=admin"
                 target="_blank"
                 className="bg-white p-6 rounded-xl border border-gray-200 hover:border-green-300 hover:shadow-md transition-all group"
               >
@@ -560,7 +560,7 @@ export function Admin() {
               </Link>
 
               <Link
-                to="/payment/cancel"
+                to="/payment/cancel?preview=admin"
                 target="_blank"
                 className="bg-white p-6 rounded-xl border border-gray-200 hover:border-red-300 hover:shadow-md transition-all group"
               >

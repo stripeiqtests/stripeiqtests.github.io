@@ -22,11 +22,20 @@ export function PaymentSuccess() {
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
-    // Skip payment verification in demo mode for admin
-    if (sessionId === 'demo' && isAdmin) {
+    const isPreview = searchParams.get('preview') === 'admin';
+
+    // Admin preview mode - skip all verification
+    if (isPreview || (sessionId === 'demo' && isAdmin)) {
       setProcessing(false);
       return;
     }
+
+    // Demo session without admin - redirect to home
+    if (sessionId === 'demo') {
+      navigate('/');
+      return;
+    }
+
     if (sessionId) {
       handlePaymentSuccess(sessionId);
     } else {
@@ -94,8 +103,9 @@ export function PaymentSuccess() {
   const defaultProcessing = lang === 'ru' ? 'Обрабатываем ваши результаты...' : 'Processing your results...';
   const defaultError = lang === 'ru' ? 'Что-то пошло не так. Свяжитесь с поддержкой.' : 'Something went wrong. Please contact support.';
 
-  // Demo mode for admin - show editable content
-  if (!processing && isAdmin && searchParams.get('session_id') === 'demo') {
+  // Admin preview mode - show editable content
+  const isPreview = searchParams.get('preview') === 'admin';
+  if (!processing && isAdmin && isPreview) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
