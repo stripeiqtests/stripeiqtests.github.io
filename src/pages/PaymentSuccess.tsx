@@ -103,31 +103,42 @@ export function PaymentSuccess() {
   const defaultProcessing = lang === 'ru' ? 'Обрабатываем ваши результаты...' : 'Processing your results...';
   const defaultError = lang === 'ru' ? 'Что-то пошло не так. Свяжитесь с поддержкой.' : 'Something went wrong. Please contact support.';
 
-  // Admin preview mode - show editable content
+  // Admin preview mode - show editable content (or static preview if not logged in)
   const isPreview = searchParams.get('preview') === 'admin';
-  if (!processing && isAdmin && isPreview) {
+  if (!processing && isPreview) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            <EditableField
-              value={getContent('payment_success_title', defaultTitle)}
-              onSave={(value) => saveContent('payment_success_title', value)}
-              as="span"
-              className="text-2xl font-bold text-gray-900"
-            />
+            {isAdmin ? (
+              <EditableField
+                value={getContent('payment_success_title', defaultTitle)}
+                onSave={(value) => saveContent('payment_success_title', value)}
+                as="span"
+                className="text-2xl font-bold text-gray-900"
+              />
+            ) : (
+              getContent('payment_success_title', defaultTitle)
+            )}
           </h1>
           <p className="text-gray-500 mb-4">
-            <EditableField
-              value={getContent('payment_success_processing', defaultProcessing)}
-              onSave={(value) => saveContent('payment_success_processing', value)}
-              as="span"
-              className="text-gray-500"
-            />
+            {isAdmin ? (
+              <EditableField
+                value={getContent('payment_success_processing', defaultProcessing)}
+                onSave={(value) => saveContent('payment_success_processing', value)}
+                as="span"
+                className="text-gray-500"
+              />
+            ) : (
+              getContent('payment_success_processing', defaultProcessing)
+            )}
           </p>
           <p className="text-sm text-indigo-600 bg-indigo-50 p-3 rounded-lg">
-            Admin mode: This is how the page appears during processing
+            {isAdmin
+              ? (lang === 'ru' ? 'Режим редактирования: нажмите на текст для изменения' : 'Edit mode: click text to edit')
+              : (lang === 'ru' ? 'Превью страницы оплаты' : 'Payment page preview')
+            }
           </p>
         </div>
       </div>
