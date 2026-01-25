@@ -8,7 +8,7 @@ import {
   Eye, EyeOff, ChevronDown, ChevronUp, ArrowLeft, FileText, Settings
 } from 'lucide-react';
 import { useAdmin } from '../lib/AdminContext';
-import { PageContentEditor } from '../components/PageContentEditor';
+import { AdminPagesDashboard } from '../components/AdminPagesDashboard';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 
 export function Admin() {
@@ -65,7 +65,7 @@ export function Admin() {
 
     if (data.value === password) {
       setIsAdmin(true);
-      sessionStorage.setItem('admin_auth', 'true');
+      localStorage.setItem('admin_auth', 'true');
       loadTests();
     } else {
       setError('Invalid password');
@@ -325,7 +325,7 @@ export function Admin() {
         </div>
 
         {/* Page Content Tab */}
-        {activeTab === 'pages' && <PageContentEditor />}
+        {activeTab === 'pages' && <AdminPagesDashboard />}
 
         {/* Tests Tab */}
         {activeTab === 'tests' && (

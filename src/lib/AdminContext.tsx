@@ -13,20 +13,20 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
-        // Check session storage on mount
-        const auth = sessionStorage.getItem('admin_auth');
+        // Check localStorage on mount
+        const auth = localStorage.getItem('admin_auth');
         if (auth === 'true') {
             setIsAdmin(true);
         }
     }, []);
 
     const checkAuth = (): boolean => {
-        const auth = sessionStorage.getItem('admin_auth');
+        const auth = localStorage.getItem('admin_auth');
         return auth === 'true';
     };
 
     const logout = () => {
-        sessionStorage.removeItem('admin_auth');
+        localStorage.removeItem('admin_auth');
         setIsAdmin(false);
     };
 

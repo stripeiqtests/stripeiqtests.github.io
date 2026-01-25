@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import type { TestSession, Test } from '../lib/supabase';
+import type { TestSession, Test, HomeContent } from '../lib/supabase';
 import { Brain, Lock, CreditCard, Mail, CheckCircle } from 'lucide-react';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
+import { EditableField } from '../components/EditableField';
 
 export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -46,12 +47,48 @@ export function Results() {
   const [test, setTest] = useState<Test | null>(isPreview ? mockTest : null);
   const [loading, setLoading] = useState(!isPreview);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [content, setContent] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    loadContent();
+  }, []);
 
   useEffect(() => {
     if (sessionId && !isPreview) {
       loadSession();
     }
   }, [sessionId, isPreview]);
+
+  async function loadContent() {
+    const { data } = await supabase
+      .from('home_content')
+      .select('*');
+
+    if (data) {
+      const contentMap: Record<string, string> = {};
+      data.forEach((item: HomeContent) => {
+        contentMap[item.key] = item.value;
+      });
+      setContent(contentMap);
+    }
+  }
+
+  async function saveContent(key: string, value: string) {
+    const { error } = await supabase
+      .from('home_content')
+      .update({ value, updated_at: new Date().toISOString() })
+      .eq('key', key);
+
+    if (error) {
+      console.error('Error saving content:', error);
+      throw error;
+    }
+
+    setContent(prev => ({ ...prev, [key]: value }));
+  }
+
+  const getContent = (key: string, fallback: string) => content[key] || fallback;
+
 
   async function loadSession() {
     const { data: sessionData, error: sessionError } = await supabase
@@ -239,6 +276,24 @@ export function Results() {
   }
 
   // Show results (paid)
+  // Helper for editable text with language suffix
+  const langKey = lang === 'ru' ? '_ru' : '_en';
+  const resultsTitle = lang === 'ru' ? 'Результаты IQ теста' : 'Your IQ Test Results';
+  const overallScoreLabel = lang === 'ru' ? 'ОБЩИЙ БАЛЛ' : 'OVERALL SCORE';
+  const profileHeading = lang === 'ru' ? 'Ваш когнитивный профиль' : 'Your Cognitive Profile';
+  const emailSentText = lang === 'ru' ? 'Копия результатов отправлена на' : 'A copy of these results has been sent to';
+  const takeAnotherText = lang === 'ru' ? 'Пройти другой тест' : 'Take Another Test';
+
+  // Dimension labels
+  const analystTitle = lang === 'ru' ? 'Аналитик' : 'Analyst';
+  const analystDesc = lang === 'ru' ? 'Логическое мышление, анализ данных' : 'Logical thinking, data analysis';
+  const strategistTitle = lang === 'ru' ? 'Стратег' : 'Strategist';
+  const strategistDesc = lang === 'ru' ? 'Планирование, оптимизация' : 'Planning, optimization';
+  const observerTitle = lang === 'ru' ? 'Наблюдатель' : 'Observer';
+  const observerDesc = lang === 'ru' ? 'Визуальное восприятие, пространственное мышление' : 'Visual perception, spatial thinking';
+  const intuitiveTitle = lang === 'ru' ? 'Интуит' : 'Intuitive';
+  const intuitiveDesc = lang === 'ru' ? 'Креативность, ассоциативное мышление' : 'Creativity, associative thinking';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
@@ -250,13 +305,31 @@ export function Results() {
         {/* Header */}
         <div className="text-center mb-8">
           <Brain className="w-16 h-16 text-indigo-600 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-gray-900">{t('results.title')}</h1>
+          {isAdmin && isPreview ? (
+            <EditableField
+              value={getContent(`results_title${langKey}`, resultsTitle)}
+              onSave={(value) => saveContent(`results_title${langKey}`, value)}
+              as="h1"
+              className="text-3xl font-bold text-gray-900"
+            />
+          ) : (
+            <h1 className="text-3xl font-bold text-gray-900">{getContent(`results_title${langKey}`, resultsTitle)}</h1>
+          )}
           <p className="text-gray-500 mt-2">{test?.title}</p>
         </div>
 
         {/* Overall Score */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-6 text-center">
-          <p className="text-sm text-gray-500 uppercase tracking-wide mb-2">{t('results.overall_score')}</p>
+          {isAdmin && isPreview ? (
+            <EditableField
+              value={getContent(`results_overall_score${langKey}`, overallScoreLabel)}
+              onSave={(value) => saveContent(`results_overall_score${langKey}`, value)}
+              as="p"
+              className="text-sm text-gray-500 uppercase tracking-wide mb-2"
+            />
+          ) : (
+            <p className="text-sm text-gray-500 uppercase tracking-wide mb-2">{getContent(`results_overall_score${langKey}`, overallScoreLabel)}</p>
+          )}
           <div className="text-6xl font-bold text-indigo-600 mb-2">
             {Math.round(session.overall_score || 0)}
           </div>
@@ -268,34 +341,99 @@ export function Results() {
         {/* Dimension Scores */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <DimensionCard
-            title={t('results.analyst')}
+            title={isAdmin && isPreview ? (
+              <EditableField
+                value={getContent(`results_analyst_title${langKey}`, analystTitle)}
+                onSave={(value) => saveContent(`results_analyst_title${langKey}`, value)}
+                as="span"
+                className="font-semibold text-gray-900"
+              />
+            ) : getContent(`results_analyst_title${langKey}`, analystTitle)}
             score={session.analyst_score || 0}
             color="blue"
-            description={t('results.analyst_desc')}
+            description={isAdmin && isPreview ? (
+              <EditableField
+                value={getContent(`results_analyst_desc${langKey}`, analystDesc)}
+                onSave={(value) => saveContent(`results_analyst_desc${langKey}`, value)}
+                as="span"
+                className="text-sm text-gray-600"
+              />
+            ) : getContent(`results_analyst_desc${langKey}`, analystDesc)}
           />
           <DimensionCard
-            title={t('results.strategist')}
+            title={isAdmin && isPreview ? (
+              <EditableField
+                value={getContent(`results_strategist_title${langKey}`, strategistTitle)}
+                onSave={(value) => saveContent(`results_strategist_title${langKey}`, value)}
+                as="span"
+                className="font-semibold text-gray-900"
+              />
+            ) : getContent(`results_strategist_title${langKey}`, strategistTitle)}
             score={session.strategist_score || 0}
             color="purple"
-            description={t('results.strategist_desc')}
+            description={isAdmin && isPreview ? (
+              <EditableField
+                value={getContent(`results_strategist_desc${langKey}`, strategistDesc)}
+                onSave={(value) => saveContent(`results_strategist_desc${langKey}`, value)}
+                as="span"
+                className="text-sm text-gray-600"
+              />
+            ) : getContent(`results_strategist_desc${langKey}`, strategistDesc)}
           />
           <DimensionCard
-            title={t('results.observer')}
+            title={isAdmin && isPreview ? (
+              <EditableField
+                value={getContent(`results_observer_title${langKey}`, observerTitle)}
+                onSave={(value) => saveContent(`results_observer_title${langKey}`, value)}
+                as="span"
+                className="font-semibold text-gray-900"
+              />
+            ) : getContent(`results_observer_title${langKey}`, observerTitle)}
             score={session.observer_score || 0}
             color="green"
-            description={t('results.observer_desc')}
+            description={isAdmin && isPreview ? (
+              <EditableField
+                value={getContent(`results_observer_desc${langKey}`, observerDesc)}
+                onSave={(value) => saveContent(`results_observer_desc${langKey}`, value)}
+                as="span"
+                className="text-sm text-gray-600"
+              />
+            ) : getContent(`results_observer_desc${langKey}`, observerDesc)}
           />
           <DimensionCard
-            title={t('results.intuitive')}
+            title={isAdmin && isPreview ? (
+              <EditableField
+                value={getContent(`results_intuitive_title${langKey}`, intuitiveTitle)}
+                onSave={(value) => saveContent(`results_intuitive_title${langKey}`, value)}
+                as="span"
+                className="font-semibold text-gray-900"
+              />
+            ) : getContent(`results_intuitive_title${langKey}`, intuitiveTitle)}
             score={session.intuitive_score || 0}
             color="yellow"
-            description={t('results.intuitive_desc')}
+            description={isAdmin && isPreview ? (
+              <EditableField
+                value={getContent(`results_intuitive_desc${langKey}`, intuitiveDesc)}
+                onSave={(value) => saveContent(`results_intuitive_desc${langKey}`, value)}
+                as="span"
+                className="text-sm text-gray-600"
+              />
+            ) : getContent(`results_intuitive_desc${langKey}`, intuitiveDesc)}
           />
         </div>
 
         {/* Profile Description */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('results.profile')}</h3>
+          {isAdmin && isPreview ? (
+            <EditableField
+              value={getContent(`results_profile_heading${langKey}`, profileHeading)}
+              onSave={(value) => saveContent(`results_profile_heading${langKey}`, value)}
+              as="h3"
+              className="text-lg font-semibold text-gray-900 mb-4"
+            />
+          ) : (
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">{getContent(`results_profile_heading${langKey}`, profileHeading)}</h3>
+          )}
           <p className="text-gray-600 leading-relaxed">
             {getProfileDescription(session, lang)}
           </p>
@@ -305,9 +443,19 @@ export function Results() {
         {session.email && (
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center gap-3">
             <Mail className="w-5 h-5 text-green-600" />
-            <p className="text-sm text-green-700">
-              {t('results.email_sent')} <strong>{session.email}</strong>
-            </p>
+            <div className="text-sm text-green-700">
+              {isAdmin && isPreview ? (
+                <EditableField
+                  value={getContent(`results_email_sent${langKey}`, emailSentText)}
+                  onSave={(value) => saveContent(`results_email_sent${langKey}`, value)}
+                  as="span"
+                  className="text-sm text-green-700"
+                />
+              ) : (
+                getContent(`results_email_sent${langKey}`, emailSentText)
+              )}{' '}
+              <strong>{session.email}</strong>
+            </div>
           </div>
         )}
 
@@ -317,7 +465,16 @@ export function Results() {
             to="/"
             className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700"
           >
-            {t('results.take_another')}
+            {isAdmin && isPreview ? (
+              <EditableField
+                value={getContent(`results_take_another${langKey}`, takeAnotherText)}
+                onSave={(value) => saveContent(`results_take_another${langKey}`, value)}
+                as="span"
+                className="text-white font-medium"
+              />
+            ) : (
+              getContent(`results_take_another${langKey}`, takeAnotherText)
+            )}
           </Link>
         </div>
       </div>
@@ -331,10 +488,10 @@ function DimensionCard({
   color,
   description
 }: {
-  title: string;
+  title: React.ReactNode;
   score: number;
   color: 'blue' | 'purple' | 'green' | 'yellow';
-  description: string;
+  description: React.ReactNode;
 }) {
   const colorClasses = {
     blue: 'border-blue-200 bg-blue-50',
@@ -358,7 +515,7 @@ function DimensionCard({
           {Math.round(score)}%
         </span>
       </div>
-      <p className="text-sm text-gray-600">{description}</p>
+      <div className="text-sm text-gray-600">{description}</div>
       <div className="mt-3 h-2 bg-white rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${color === 'blue' ? 'bg-blue-500' :

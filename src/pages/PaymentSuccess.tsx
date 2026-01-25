@@ -46,8 +46,7 @@ export function PaymentSuccess() {
   async function loadContent() {
     const { data } = await supabase
       .from('home_content')
-      .select('*')
-      .eq('language', lang);
+      .select('*');
 
     if (data) {
       const contentMap: Record<string, string> = {};
@@ -61,11 +60,15 @@ export function PaymentSuccess() {
   async function saveContent(key: string, value: string) {
     const { error } = await supabase
       .from('home_content')
-      .upsert({ key, value, language: lang }, { onConflict: 'key,language' });
+      .update({ value, updated_at: new Date().toISOString() })
+      .eq('key', key);
 
-    if (!error) {
-      setContent(prev => ({ ...prev, [key]: value }));
+    if (error) {
+      console.error('Error saving content:', error);
+      throw error;
     }
+
+    setContent(prev => ({ ...prev, [key]: value }));
   }
 
   const getContent = (key: string, fallback: string) => content[key] || fallback;
@@ -122,7 +125,7 @@ export function PaymentSuccess() {
               getContent('payment_success_title', defaultTitle)
             )}
           </h1>
-          <p className="text-gray-500 mb-4">
+          <div className="text-gray-500 mb-4">
             {isAdmin ? (
               <EditableField
                 value={getContent('payment_success_processing', defaultProcessing)}
@@ -133,7 +136,7 @@ export function PaymentSuccess() {
             ) : (
               getContent('payment_success_processing', defaultProcessing)
             )}
-          </p>
+          </div>
           <p className="text-sm text-indigo-600 bg-indigo-50 p-3 rounded-lg">
             {isAdmin
               ? (lang === 'ru' ? 'Режим редактирования: нажмите на текст для изменения' : 'Edit mode: click text to edit')
