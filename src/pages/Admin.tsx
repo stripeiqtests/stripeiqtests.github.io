@@ -5,7 +5,8 @@ import type { Test, Question } from '../lib/supabase';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Brain, Lock, Plus, Edit2, Trash2, Save, X,
-  Eye, EyeOff, ChevronDown, ChevronUp, ArrowLeft, FileText, Settings
+  Eye, EyeOff, ChevronDown, ChevronUp, ArrowLeft, FileText, Settings,
+  Upload, Image, Link2
 } from 'lucide-react';
 import { useAdmin } from '../lib/AdminContext';
 import { AdminPagesDashboard } from '../components/AdminPagesDashboard';
@@ -597,10 +598,12 @@ function QuestionForm({
   onSave: (question: Partial<Question>) => void;
   onCancel: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [qNumber, setQNumber] = useState(question?.question_number || questionNumber);
   const [text, setText] = useState(question?.question_text || '');
   const [imageUrl, setImageUrl] = useState(question?.image_url || '');
+  const [useUrlInput, setUseUrlInput] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [options, setOptions] = useState<{ label: string; value: string }[]>(() => {
     if (!question?.options) {
       return [
@@ -627,6 +630,57 @@ function QuestionForm({
   });
   const [correctAnswer, setCorrectAnswer] = useState(question?.correct_answer || 'A');
   const [dimension, setDimension] = useState<Question['dimension']>(question?.dimension || 'analyst');
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert(lang === 'ru' ? 'Пожалуйста, выберите изображение' : 'Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert(lang === 'ru' ? 'Файл слишком большой (макс. 5МБ)' : 'File too large (max 5MB)');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `question_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `questions/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
+
+      setImageUrl(publicUrl);
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(lang === 'ru' ? 'Ошибка загрузки' : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleRemoveImage() {
+    setImageUrl('');
+  }
 
   return (
     <div className="bg-white p-4 rounded-lg border border-indigo-200 mb-2">
@@ -665,15 +719,87 @@ function QuestionForm({
         />
       </div>
 
+      {/* Image Section */}
       <div className="mt-3">
-        <label className="text-xs text-gray-500">{t('admin.image_url')}</label>
-        <input
-          type="text"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          placeholder="https://..."
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-        />
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs text-gray-500">
+            {lang === 'ru' ? 'Изображение (опционально)' : 'Image (optional)'}
+          </label>
+          <button
+            type="button"
+            onClick={() => setUseUrlInput(!useUrlInput)}
+            className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+          >
+            {useUrlInput ? (
+              <>
+                <Upload className="w-3 h-3" />
+                {lang === 'ru' ? 'Загрузить файл' : 'Upload file'}
+              </>
+            ) : (
+              <>
+                <Link2 className="w-3 h-3" />
+                {lang === 'ru' ? 'Ввести URL' : 'Enter URL'}
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Image Preview */}
+        {imageUrl && (
+          <div className="mb-2 relative inline-block">
+            <img
+              src={imageUrl}
+              alt="Preview"
+              className="max-h-32 rounded-lg border border-gray-200"
+            />
+            <button
+              type="button"
+              onClick={handleRemoveImage}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
+        {useUrlInput ? (
+          /* URL Input */
+          <input
+            type="text"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://..."
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+          />
+        ) : (
+          /* File Upload */
+          <div className="flex items-center gap-2">
+            <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                disabled={uploading}
+                className="hidden"
+              />
+              {uploading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                  <span className="text-sm text-gray-500">
+                    {lang === 'ru' ? 'Загрузка...' : 'Uploading...'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Image className="w-5 h-5 text-gray-400" />
+                  <span className="text-sm text-gray-500">
+                    {lang === 'ru' ? 'Нажмите для загрузки изображения' : 'Click to upload image'}
+                  </span>
+                </>
+              )}
+            </label>
+          </div>
+        )}
       </div>
 
       <div className="mt-3">
