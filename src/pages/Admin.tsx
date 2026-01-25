@@ -31,9 +31,8 @@ export function Admin() {
   const location = useLocation();
 
   // Determine active tab from URL
-  const getActiveTab = (): 'tests' | 'content' | 'pages' => {
+  const getActiveTab = (): 'tests' | 'pages' => {
     const path = location.pathname;
-    if (path.includes('/admin/content')) return 'content';
     if (path.includes('/admin/pages')) return 'pages';
     return 'tests';
   };
@@ -312,8 +311,8 @@ export function Admin() {
             </span>
           </Link>
           <Link
-            to="/admin/content"
-            className={`pb-3 px-1 font-medium transition-colors relative ${activeTab === 'content'
+            to="/admin/pages"
+            className={`pb-3 px-1 font-medium transition-colors relative ${activeTab === 'pages'
               ? 'text-indigo-600 border-b-2 border-indigo-600'
               : 'text-gray-500 hover:text-gray-700'
               }`}
@@ -323,22 +322,10 @@ export function Admin() {
               {t('admin.page_content')}
             </span>
           </Link>
-          <Link
-            to="/admin/pages"
-            className={`pb-3 px-1 font-medium transition-colors relative ${activeTab === 'pages'
-              ? 'text-indigo-600 border-b-2 border-indigo-600'
-              : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            <span className="flex items-center gap-2">
-              <Eye className="w-4 h-4" />
-              {t('admin.view_pages')}
-            </span>
-          </Link>
         </div>
 
         {/* Page Content Tab */}
-        {activeTab === 'content' && <PageContentEditor />}
+        {activeTab === 'pages' && <PageContentEditor />}
 
         {/* Tests Tab */}
         {activeTab === 'tests' && (
@@ -522,73 +509,8 @@ export function Admin() {
           </>
         )}
 
-        {/* Pages Tab - Quick access to view and edit pages */}
-        {activeTab === 'pages' && (
-          <div className="space-y-4">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-2">{t('admin.view_pages')}</h2>
-              <p className="text-gray-500 text-sm">{t('admin.view_pages_desc')}</p>
-            </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Link
-                to="/"
-                target="_blank"
-                className="bg-white p-6 rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all group"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-                    <Brain className="w-5 h-5 text-indigo-600" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900">{t('admin.home_page')}</h3>
-                </div>
-                <p className="text-sm text-gray-500">{t('admin.home_page_desc')}</p>
-              </Link>
 
-              <Link
-                to="/payment/success?preview=admin"
-                target="_blank"
-                className="bg-white p-6 rounded-xl border border-gray-200 hover:border-green-300 hover:shadow-md transition-all group"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                    <Eye className="w-5 h-5 text-green-600" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900">{t('admin.payment_success')}</h3>
-                </div>
-                <p className="text-sm text-gray-500">{t('admin.payment_success_desc')}</p>
-              </Link>
-
-              <Link
-                to="/payment/cancel?preview=admin"
-                target="_blank"
-                className="bg-white p-6 rounded-xl border border-gray-200 hover:border-red-300 hover:shadow-md transition-all group"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
-                    <X className="w-5 h-5 text-red-600" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900">{t('admin.payment_cancel')}</h3>
-                </div>
-                <p className="text-sm text-gray-500">{t('admin.payment_cancel_desc')}</p>
-              </Link>
-
-              <Link
-                to="/results/preview?preview=admin"
-                target="_blank"
-                className="bg-white p-6 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all group"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                    <FileText className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900">{t('admin.results_page')}</h3>
-                </div>
-                <p className="text-sm text-gray-500">{t('admin.results_page_desc')}</p>
-              </Link>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   );
