@@ -129,7 +129,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'IQ Test <onboarding@resend.dev>',
+        from: 'IQ Test <noreply@inner-code.me>',
         to: [session.email],
         subject: `Your IQ Test Results - Score: ${Math.round(session.overall_score || 0)}`,
         html: emailBody,
