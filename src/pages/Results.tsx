@@ -1,24 +1,57 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { TestSession, Test } from '../lib/supabase';
 import { Brain, Lock, CreditCard, Mail, CheckCircle } from 'lucide-react';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
+import { useAdmin } from '../lib/AdminContext';
 
 export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const [searchParams] = useSearchParams();
   const { t, lang } = useLanguage();
+  const { isAdmin } = useAdmin();
 
-  const [session, setSession] = useState<TestSession | null>(null);
-  const [test, setTest] = useState<Test | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Preview mode check
+  const isPreview = searchParams.get('preview') === 'admin';
+
+  // Mock data for preview mode
+  const mockSession: TestSession = {
+    id: 'preview-session',
+    test_id: 'preview-test',
+    email: 'demo@example.com',
+    answers: '{}',
+    is_paid: true,
+    overall_score: 78,
+    analyst_score: 85,
+    strategist_score: 72,
+    observer_score: 65,
+    intuitive_score: 88,
+    created_at: new Date().toISOString(),
+    completed_at: new Date().toISOString(),
+    stripe_session_id: null,
+  };
+
+  const mockTest: Test = {
+    id: 'preview-test',
+    title: lang === 'ru' ? 'IQ Тест (Превью)' : 'IQ Test (Preview)',
+    slug: 'preview',
+    description: 'Preview mode',
+    price_cents: 500,
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
+
+  const [session, setSession] = useState<TestSession | null>(isPreview ? mockSession : null);
+  const [test, setTest] = useState<Test | null>(isPreview ? mockTest : null);
+  const [loading, setLoading] = useState(!isPreview);
   const [processingPayment, setProcessingPayment] = useState(false);
 
   useEffect(() => {
-    if (sessionId) {
+    if (sessionId && !isPreview) {
       loadSession();
     }
-  }, [sessionId]);
+  }, [sessionId, isPreview]);
 
   async function loadSession() {
     const { data: sessionData, error: sessionError } = await supabase

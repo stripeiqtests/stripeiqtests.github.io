@@ -573,13 +573,10 @@ export function Admin() {
                 <p className="text-sm text-gray-500">{t('admin.payment_cancel_desc')}</p>
               </Link>
 
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  alert(t('admin.results_requires_session'));
-                }}
-                className="bg-white p-6 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all group cursor-pointer"
+              <Link
+                to="/results/preview?preview=admin"
+                target="_blank"
+                className="bg-white p-6 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all group"
               >
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
@@ -588,7 +585,7 @@ export function Admin() {
                   <h3 className="font-semibold text-gray-900">{t('admin.results_page')}</h3>
                 </div>
                 <p className="text-sm text-gray-500">{t('admin.results_page_desc')}</p>
-              </a>
+              </Link>
             </div>
           </div>
         )}
