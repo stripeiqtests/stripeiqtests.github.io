@@ -94,7 +94,11 @@ export function PaymentSuccess() {
       if (data?.testSessionId) {
         // Track successful purchase
         trackPurchase(data.testId || '', data.testSessionId, data.amountPaid || 500);
-        navigate(`/results/${data.testSessionId}`);
+
+        // Small delay to ensure analytics event is sent before navigation
+        setTimeout(() => {
+          navigate(`/results/${data.testSessionId}`);
+        }, 100);
       } else {
         throw new Error('No test session ID returned');
       }

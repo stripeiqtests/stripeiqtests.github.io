@@ -143,8 +143,11 @@ export function Test() {
     // Track test complete event
     trackTestComplete(test.id, test.title, questions.length);
 
-    // Navigate to results page
-    navigate(`/results/${session.id}`);
+    // Small delay to ensure analytics event is sent before navigation
+    setTimeout(() => {
+      // Navigate to results page
+      navigate(`/results/${session.id}`);
+    }, 100);
   }
 
   if (loading) {
