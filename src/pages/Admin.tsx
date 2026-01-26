@@ -11,6 +11,7 @@ import {
 import { useAdmin } from '../lib/AdminContext';
 import { AdminPagesDashboard } from '../components/AdminPagesDashboard';
 import { AdminArchetypesTab } from '../components/AdminArchetypesTab';
+import { AdminSettingsTab } from '../components/AdminSettingsTab';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 
 export function Admin() {
@@ -33,10 +34,11 @@ export function Admin() {
   const location = useLocation();
 
   // Determine active tab from URL
-  const getActiveTab = (): 'tests' | 'pages' | 'archetypes' => {
+  const getActiveTab = (): 'tests' | 'pages' | 'archetypes' | 'settings' => {
     const path = location.pathname;
     if (path.includes('/admin/pages')) return 'pages';
     if (path.includes('/admin/archetypes')) return 'archetypes';
+    if (path.includes('/admin/settings')) return 'settings';
     return 'tests';
   };
   const activeTab = getActiveTab();
@@ -337,6 +339,18 @@ export function Admin() {
               {t('admin.page_content')}
             </span>
           </Link>
+          <Link
+            to="/admin/settings"
+            className={`pb-3 px-1 font-medium transition-colors relative ${activeTab === 'settings'
+              ? 'text-indigo-600 border-b-2 border-indigo-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            <span className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              {t('admin.settings') || 'Settings'}
+            </span>
+          </Link>
         </div>
 
         {/* Page Content Tab */}
@@ -344,6 +358,9 @@ export function Admin() {
 
         {/* Archetypes Tab */}
         {activeTab === 'archetypes' && <AdminArchetypesTab />}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && <AdminSettingsTab tests={tests} />}
 
         {/* Tests Tab */}
         {activeTab === 'tests' && (
