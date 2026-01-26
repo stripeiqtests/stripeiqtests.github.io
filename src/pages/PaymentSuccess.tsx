@@ -5,8 +5,8 @@ import { CheckCircle } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
-import type { HomeContent } from '../lib/supabase';
 import { trackPurchase } from '../lib/analytics';
+import { useContent } from '../lib/useContent';
 
 export function PaymentSuccess() {
   const [searchParams] = useSearchParams();
@@ -15,11 +15,7 @@ export function PaymentSuccess() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { lang } = useLanguage();
   const { isAdmin } = useAdmin();
-  const [content, setContent] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    loadContent();
-  }, [lang]);
+  const { getContent, saveContent } = useContent();
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
@@ -43,36 +39,6 @@ export function PaymentSuccess() {
       navigate('/');
     }
   }, [searchParams, navigate, isAdmin]);
-
-  async function loadContent() {
-    const { data } = await supabase
-      .from('home_content')
-      .select('*');
-
-    if (data) {
-      const contentMap: Record<string, string> = {};
-      data.forEach((item: HomeContent) => {
-        contentMap[item.key] = item.value;
-      });
-      setContent(contentMap);
-    }
-  }
-
-  async function saveContent(key: string, value: string) {
-    const { error } = await supabase
-      .from('home_content')
-      .update({ value, updated_at: new Date().toISOString() })
-      .eq('key', key);
-
-    if (error) {
-      console.error('Error saving content:', error);
-      throw error;
-    }
-
-    setContent(prev => ({ ...prev, [key]: value }));
-  }
-
-  const getContent = (key: string, fallback: string) => content[key] || fallback;
 
   async function handlePaymentSuccess(stripeSessionId: string) {
     try {

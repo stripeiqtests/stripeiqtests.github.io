@@ -5,7 +5,7 @@ import { useAdmin } from '../lib/AdminContext';
 interface EditableFieldProps {
     value: string;
     onSave: (value: string) => Promise<void>;
-    as?: 'h1' | 'h2' | 'h3' | 'p' | 'span';
+    as?: 'h1' | 'h2' | 'h3' | 'h4' | 'p' | 'span';
     className?: string;
     multiline?: boolean;
 }

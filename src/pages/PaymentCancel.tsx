@@ -1,58 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { XCircle } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
-import { supabase } from '../lib/supabase';
-import type { HomeContent } from '../lib/supabase';
 import { trackPaymentCancel } from '../lib/analytics';
+import { useContent } from '../lib/useContent';
 
 export function PaymentCancel() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
   const { lang } = useLanguage();
   const { isAdmin } = useAdmin();
-  const [content, setContent] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    loadContent();
-  }, [lang]);
+  const { getContent, saveContent } = useContent();
 
   // Track payment cancellation event
   useEffect(() => {
     trackPaymentCancel();
   }, []);
-
-  async function loadContent() {
-    const { data } = await supabase
-      .from('home_content')
-      .select('*');
-
-    if (data) {
-      const contentMap: Record<string, string> = {};
-      data.forEach((item: HomeContent) => {
-        contentMap[item.key] = item.value;
-      });
-      setContent(contentMap);
-    }
-  }
-
-  async function saveContent(key: string, value: string) {
-    const { error } = await supabase
-      .from('home_content')
-      .update({ value, updated_at: new Date().toISOString() })
-      .eq('key', key);
-
-    if (error) {
-      console.error('Error saving content:', error);
-      throw error;
-    }
-
-    setContent(prev => ({ ...prev, [key]: value }));
-  }
-
-  const getContent = (key: string, fallback: string) => content[key] || fallback;
 
   const defaultTitle = lang === 'ru' ? 'Оплата отменена' : 'Payment Cancelled';
   const defaultMessage = lang === 'ru'

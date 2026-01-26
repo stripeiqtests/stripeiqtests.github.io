@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import type { Test, HomeContent } from '../lib/supabase';
+import type { Test } from '../lib/supabase';
 import { Brain, Clock, Target, Sparkles, Settings, Edit2, BookOpen, ChevronDown } from 'lucide-react';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
+import { useContent } from '../lib/useContent';
 
 export function Home() {
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
-  const [content, setContent] = useState<Record<string, string>>({});
   const { t, lang } = useLanguage();
   const { isAdmin } = useAdmin();
+  const { getContent, saveContent } = useContent();
 
   useEffect(() => {
     loadTests();
-    loadContent();
   }, []);
 
   async function loadTests() {
@@ -33,40 +33,6 @@ export function Home() {
     }
     setLoading(false);
   }
-
-  async function loadContent() {
-    const { data, error } = await supabase
-      .from('home_content')
-      .select('*');
-
-    if (error) {
-      console.error('Error loading content:', error);
-      return;
-    }
-
-    const contentMap: Record<string, string> = {};
-    (data as HomeContent[] || []).forEach(item => {
-      contentMap[item.key] = item.value;
-    });
-    setContent(contentMap);
-  }
-
-  async function saveContent(key: string, value: string) {
-    const { error } = await supabase
-      .from('home_content')
-      .update({ value, updated_at: new Date().toISOString() })
-      .eq('key', key);
-
-    if (error) {
-      console.error('Error saving content:', error);
-      throw error;
-    }
-
-    setContent(prev => ({ ...prev, [key]: value }));
-  }
-
-  // Get content with fallback to default
-  const getContent = (key: string, fallback: string) => content[key] || fallback;
 
   const heroTitle = lang === 'ru'
     ? getContent('hero_title_ru', 'Раскройте свой когнитивный профиль')
@@ -89,6 +55,37 @@ export function Home() {
   const feature3Desc = lang === 'ru' ? getContent('feature3_desc_ru', 'Аналитик, Стратег, Наблюдатель, Интуит') : getContent('feature3_desc_en', 'Analyst, Strategist, Observer, Intuitive');
   const feature4Title = lang === 'ru' ? getContent('feature4_title_ru', 'Визуальные задачи') : getContent('feature4_title_en', 'Visual Puzzles');
   const feature4Desc = lang === 'ru' ? getContent('feature4_desc_ru', 'Логика + визуальное мышление') : getContent('feature4_desc_en', 'Logic + visual reasoning tasks');
+
+  // Methodology section content
+  const methodologyTitle = lang === 'ru' ? getContent('methodology_title_ru', 'На чём основан этот тест') : getContent('methodology_title_en', 'What This Test Is Based On');
+  const methodologyIntro = lang === 'ru'
+    ? getContent('methodology_intro_ru', 'Этот тест не является медицинской или клинической диагностикой. Он создан как интерпретационный инструмент, помогающий понять, какой способ мышления у вас является ведущим и через какие архетипические образы он чаще всего проявляется.')
+    : getContent('methodology_intro_en', 'This test is not a medical or clinical diagnosis. It is an interpretive tool designed to help you understand your dominant thinking style and the archetypal patterns through which it manifests.');
+
+  const methodSub1Title = lang === 'ru' ? getContent('method_sub1_title_ru', '🧠 Что именно мы измеряем') : getContent('method_sub1_title_en', '🧠 What We Measure');
+  const methodSub1Content = lang === 'ru'
+    ? getContent('method_sub1_content_ru', 'В основе теста лежит когнитивный стиль мышления — то, как человек обрабатывает информацию, принимает решения и ориентируется в реальности. В психологии выделяют когнитивные стили: аналитический, стратегический, наблюдательный, интуитивный. Это не черты характера и не «типы личности», а способы мышления, которые могут меняться и сочетаться.')
+    : getContent('method_sub1_content_en', 'The test is based on cognitive thinking styles — how a person processes information, makes decisions, and navigates reality. Psychology identifies cognitive styles: analytical, strategic, observational, intuitive. These are not personality traits but thinking patterns that can change and combine.');
+
+  const methodSub2Title = lang === 'ru' ? getContent('method_sub2_title_ru', '🧩 Как здесь появляются архетипы') : getContent('method_sub2_title_en', '🧩 How Archetypes Appear');
+  const methodSub2Content = lang === 'ru'
+    ? getContent('method_sub2_content_ru', 'Карл Юнг не связывал напрямую тип мышления с конкретным архетипом. В юнгианской психологии: архетипы — модели поведения, энергии и ролей; а не описание интеллекта или логики. Связь «тип мышления → архетип» — интерпретационная модель.')
+    : getContent('method_sub2_content_en', 'Carl Jung did not directly link thinking types with specific archetypes. In Jungian psychology: archetypes are patterns of behavior, energy, and roles; not descriptions of intellect or logic. The "thinking type → archetype" connection is an interpretive model.');
+
+  const methodSub3Title = lang === 'ru' ? getContent('method_sub3_title_ru', '🧱 На что мы опираемся') : getContent('method_sub3_title_en', '🧱 Our Foundation');
+  const methodSub3Content = lang === 'ru'
+    ? getContent('method_sub3_content_ru', '1. Аналитическая психология К. Г. Юнга — базовые функции: мышление, чувство, интуиция, ощущение. 2. Современная психология мышления — когнитивные стили коррелируют с моделями поведения. 3. Культурная психология (Joseph Campbell, Carol S. Pearson) — устойчивые архетипические образы.')
+    : getContent('method_sub3_content_en', '1. Analytical Psychology of C.G. Jung — basic functions: thinking, feeling, intuition, sensation. 2. Modern psychology of thinking — cognitive styles correlate with behavior patterns. 3. Cultural psychology (Joseph Campbell, Carol S. Pearson) — stable archetypal images.');
+
+  const methodSub4Title = lang === 'ru' ? getContent('method_sub4_title_ru', '🔍 Как проверить самостоятельно') : getContent('method_sub4_title_en', '🔍 How to Verify Yourself');
+  const methodSub4Content = lang === 'ru'
+    ? getContent('method_sub4_content_ru', 'Ищите по запросам: cognitive styles psychology, Jung psychological functions, archetypes king magician warrior trickster, Carol Pearson archetypes, Joseph Campbell archetypal psychology.')
+    : getContent('method_sub4_content_en', 'Search for: cognitive styles psychology, Jung psychological functions, archetypes king magician warrior trickster, Carol Pearson archetypes, Joseph Campbell archetypal psychology.');
+
+  const methodSub5Title = lang === 'ru' ? getContent('method_sub5_title_ru', '🧭 Как воспринимать результаты') : getContent('method_sub5_title_en', '🧭 How to Interpret Results');
+  const methodSub5Content = lang === 'ru'
+    ? getContent('method_sub5_content_ru', 'Результаты показывают ваш ведущий способ мышления и архетипическое направление. Обычно у человека: 1 основной архетип, 1–2 поддерживающих, 1 архетип в тени. За более точной картиной — углублённый тест.')
+    : getContent('method_sub5_content_en', 'Results show your dominant thinking style and archetypal direction. Typically a person has: 1 main archetype, 1-2 supporting, 1 shadow archetype. For a more accurate picture — take the extended test.');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
@@ -206,108 +203,127 @@ export function Home() {
           <summary className="flex items-center justify-between px-6 py-4 cursor-pointer select-none">
             <div className="flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-indigo-600" />
-              <span className="font-semibold text-gray-900">На чём основан этот тест</span>
+              <EditableField
+                value={methodologyTitle}
+                onSave={(value) => saveContent(lang === 'ru' ? 'methodology_title_ru' : 'methodology_title_en', value)}
+                as="span"
+                className="font-semibold text-gray-900"
+              />
             </div>
             <div className="text-gray-400 group-open:rotate-180 transition-transform">
               <ChevronDown className="w-5 h-5" />
             </div>
           </summary>
           <div className="px-6 pb-6 pt-2 space-y-3 text-sm leading-relaxed text-gray-700">
-            <p>
-              Этот тест не является медицинской или клинической диагностикой. Он создан как интерпретационный инструмент,
-              помогающий понять, какой способ мышления у вас является ведущим и через какие архетипические образы он чаще всего проявляется.
-            </p>
+            <EditableField
+              value={methodologyIntro}
+              onSave={(value) => saveContent(lang === 'ru' ? 'methodology_intro_ru' : 'methodology_intro_en', value)}
+              as="p"
+              multiline
+            />
 
             {/* Sub-section 1 */}
             <details className="group/sub border border-gray-100 rounded-lg">
               <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 rounded-lg">
-                <h4 className="font-semibold text-gray-900 flex items-center gap-2">🧠 Что именно мы измеряем</h4>
+                <EditableField
+                  value={methodSub1Title}
+                  onSave={(value) => saveContent(lang === 'ru' ? 'method_sub1_title_ru' : 'method_sub1_title_en', value)}
+                  as="h4"
+                  className="font-semibold text-gray-900 flex items-center gap-2"
+                />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
               </summary>
-              <div className="px-4 pb-4 space-y-2">
-                <p>В основе теста лежит когнитивный стиль мышления — то, как человек обрабатывает информацию, принимает решения и ориентируется в реальности.</p>
-                <p className="text-gray-600">В психологии выделяют когнитивные стили:</p>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>аналитический</li>
-                  <li>стратегический</li>
-                  <li>наблюдательный</li>
-                  <li>интуитивный</li>
-                </ul>
-                <p>Это не черты характера и не «типы личности», а способы мышления, которые могут меняться и сочетаться.</p>
+              <div className="px-4 pb-4">
+                <EditableField
+                  value={methodSub1Content}
+                  onSave={(value) => saveContent(lang === 'ru' ? 'method_sub1_content_ru' : 'method_sub1_content_en', value)}
+                  as="p"
+                  multiline
+                />
               </div>
             </details>
 
             {/* Sub-section 2 */}
             <details className="group/sub border border-gray-100 rounded-lg">
               <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 rounded-lg">
-                <h4 className="font-semibold text-gray-900 flex items-center gap-2">🧩 Как здесь появляются архетипы</h4>
+                <EditableField
+                  value={methodSub2Title}
+                  onSave={(value) => saveContent(lang === 'ru' ? 'method_sub2_title_ru' : 'method_sub2_title_en', value)}
+                  as="h4"
+                  className="font-semibold text-gray-900 flex items-center gap-2"
+                />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
               </summary>
-              <div className="px-4 pb-4 space-y-2">
-                <p>Карл Юнг не связывал напрямую тип мышления с конкретным архетипом. В юнгианской психологии:</p>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>архетипы — модели поведения, энергии и ролей;</li>
-                  <li>а не описание интеллекта или логики.</li>
-                </ul>
-                <p>Связь «тип мышления → архетип» — интерпретационная модель.</p>
+              <div className="px-4 pb-4">
+                <EditableField
+                  value={methodSub2Content}
+                  onSave={(value) => saveContent(lang === 'ru' ? 'method_sub2_content_ru' : 'method_sub2_content_en', value)}
+                  as="p"
+                  multiline
+                />
               </div>
             </details>
 
             {/* Sub-section 3 */}
             <details className="group/sub border border-gray-100 rounded-lg">
               <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 rounded-lg">
-                <h4 className="font-semibold text-gray-900 flex items-center gap-2">🧱 На что мы опираемся</h4>
+                <EditableField
+                  value={methodSub3Title}
+                  onSave={(value) => saveContent(lang === 'ru' ? 'method_sub3_title_ru' : 'method_sub3_title_en', value)}
+                  as="h4"
+                  className="font-semibold text-gray-900 flex items-center gap-2"
+                />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
               </summary>
-              <div className="px-4 pb-4 space-y-3">
-                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
-                  <p className="font-medium text-gray-900">1. Аналитическая психология К. Г. Юнга</p>
-                  <p className="text-gray-700">Базовые функции: мышление, чувство, интуиция, ощущение. Архетипы — формы проявления этих функций.</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
-                  <p className="font-medium text-gray-900">2. Современная психология мышления</p>
-                  <p className="text-gray-700">Когнитивные стили коррелируют с моделями поведения. Аналитическое мышление чаще связано с контролем, иерархией, ответственностью, структурой — поэтому сочетается с архетипами Короля/Королевы или Мага.</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
-                  <p className="font-medium text-gray-900">3. Культурная и архетипическая психология</p>
-                  <p className="text-gray-700">(Joseph Campbell, Carol S. Pearson). Устойчивые образы: Король/Королева — порядок, Воин — действие, Маг — знание, Трикстер — интуиция и игра.</p>
-                </div>
+              <div className="px-4 pb-4">
+                <EditableField
+                  value={methodSub3Content}
+                  onSave={(value) => saveContent(lang === 'ru' ? 'method_sub3_content_ru' : 'method_sub3_content_en', value)}
+                  as="p"
+                  multiline
+                />
               </div>
             </details>
 
             {/* Sub-section 4 */}
             <details className="group/sub border border-gray-100 rounded-lg">
               <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 rounded-lg">
-                <h4 className="font-semibold text-gray-900 flex items-center gap-2">🔍 Как проверить самостоятельно</h4>
+                <EditableField
+                  value={methodSub4Title}
+                  onSave={(value) => saveContent(lang === 'ru' ? 'method_sub4_title_ru' : 'method_sub4_title_en', value)}
+                  as="h4"
+                  className="font-semibold text-gray-900 flex items-center gap-2"
+                />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
               </summary>
-              <div className="px-4 pb-4 space-y-2">
-                <p className="text-gray-700">Ищите по запросам:</p>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li><em className="text-indigo-600 not-italic bg-indigo-50 px-1.5 py-0.5 rounded">cognitive styles psychology</em></li>
-                  <li><em className="text-indigo-600 not-italic bg-indigo-50 px-1.5 py-0.5 rounded">Jung psychological functions</em></li>
-                  <li><em className="text-indigo-600 not-italic bg-indigo-50 px-1.5 py-0.5 rounded">archetypes king magician warrior trickster</em></li>
-                  <li><em className="text-indigo-600 not-italic bg-indigo-50 px-1.5 py-0.5 rounded">Carol Pearson archetypes</em></li>
-                  <li><em className="text-indigo-600 not-italic bg-indigo-50 px-1.5 py-0.5 rounded">Joseph Campbell archetypal psychology</em></li>
-                </ul>
+              <div className="px-4 pb-4">
+                <EditableField
+                  value={methodSub4Content}
+                  onSave={(value) => saveContent(lang === 'ru' ? 'method_sub4_content_ru' : 'method_sub4_content_en', value)}
+                  as="p"
+                  multiline
+                />
               </div>
             </details>
 
             {/* Sub-section 5 */}
             <details className="group/sub border border-gray-100 rounded-lg">
               <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 rounded-lg">
-                <h4 className="font-semibold text-gray-900 flex items-center gap-2">🧭 Как воспринимать результаты</h4>
+                <EditableField
+                  value={methodSub5Title}
+                  onSave={(value) => saveContent(lang === 'ru' ? 'method_sub5_title_ru' : 'method_sub5_title_en', value)}
+                  as="h4"
+                  className="font-semibold text-gray-900 flex items-center gap-2"
+                />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
               </summary>
-              <div className="px-4 pb-4 space-y-2">
-                <p>Результаты показывают ваш ведущий способ мышления и архетипическое направление, через которое он проявляется.</p>
-                <p className="text-gray-700">Обычно у человека:</p>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>1 основной архетип</li>
-                  <li>1–2 поддерживающих</li>
-                  <li>1 архетип в тени</li>
-                </ul>
-                <p>За более точной картиной — углублённый тест.</p>
+              <div className="px-4 pb-4">
+                <EditableField
+                  value={methodSub5Content}
+                  onSave={(value) => saveContent(lang === 'ru' ? 'method_sub5_content_ru' : 'method_sub5_content_en', value)}
+                  as="p"
+                  multiline
+                />
               </div>
             </details>
           </div>
@@ -373,7 +389,7 @@ export function Home() {
 
       {/* Footer */}
       <footer className="bg-white border-t border-gray-100 py-8">
-        <div className="max-w-6xl mx-auto px-4 text-center text-sm text-gray-500">
+        <div className="max-w-6xl mx-auto px-4 text-center">
           <EditableField
             value={footerText}
             onSave={(value) => saveContent(lang === 'ru' ? 'footer_ru' : 'footer_en', value)}
@@ -381,6 +397,15 @@ export function Home() {
             className="text-sm text-gray-500"
             multiline
           />
+          <div className="mt-4 flex justify-center gap-4 text-sm">
+            <a href="/privacy" className="text-gray-400 hover:text-indigo-600 transition-colors">
+              {lang === 'ru' ? 'Политика конфиденциальности' : 'Privacy Policy'}
+            </a>
+            <span className="text-gray-300">|</span>
+            <a href="/terms" className="text-gray-400 hover:text-indigo-600 transition-colors">
+              {lang === 'ru' ? 'Условия использования' : 'Terms of Use'}
+            </a>
+          </div>
         </div>
       </footer>
     </div>

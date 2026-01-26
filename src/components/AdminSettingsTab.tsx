@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Test } from '../lib/supabase';
-import { Save, Check } from 'lucide-react';
+import { Save, Check, Globe } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
 
 interface AdminSettingsTabProps {
     tests: Test[];
 }
 
+type LanguageMode = 'ru' | 'en' | 'bilingual';
+
 export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
-    const { lang } = useLanguage();
+    const { lang, languageMode, setLanguageMode } = useLanguage();
     const [followUpTestSlug, setFollowUpTestSlug] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [savingLanguageMode, setSavingLanguageMode] = useState(false);
+    const [languageModeSaved, setLanguageModeSaved] = useState(false);
 
     useEffect(() => {
         loadSettings();
@@ -55,6 +59,19 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
         setTimeout(() => setSaved(false), 2000);
     }
 
+    async function handleLanguageModeChange(mode: LanguageMode) {
+        setSavingLanguageMode(true);
+        setLanguageModeSaved(false);
+        try {
+            await setLanguageMode(mode);
+            setLanguageModeSaved(true);
+            setTimeout(() => setLanguageModeSaved(false), 2000);
+        } catch (error) {
+            console.error('Error saving language mode:', error);
+        }
+        setSavingLanguageMode(false);
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
@@ -68,6 +85,91 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
             <h2 className="text-xl font-bold text-gray-900">
                 {lang === 'ru' ? 'Настройки' : 'Settings'}
             </h2>
+
+            {/* Language Mode Setting */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                    <Globe className="w-5 h-5 text-indigo-600" />
+                    <h3 className="text-lg font-semibold text-gray-900">
+                        {lang === 'ru' ? 'Режим языка' : 'Language Mode'}
+                    </h3>
+                    {languageModeSaved && (
+                        <span className="text-sm text-green-600 flex items-center gap-1">
+                            <Check className="w-4 h-4" />
+                            {lang === 'ru' ? 'Сохранено' : 'Saved'}
+                        </span>
+                    )}
+                    {savingLanguageMode && (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                    )}
+                </div>
+                <p className="text-sm text-gray-600 mb-4">
+                    {lang === 'ru'
+                        ? 'Выберите язык отображения сайта для всех пользователей.'
+                        : 'Select the display language for all users.'}
+                </p>
+
+                <div className="space-y-3">
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
+                        <input
+                            type="radio"
+                            name="languageMode"
+                            value="ru"
+                            checked={languageMode === 'ru'}
+                            onChange={() => handleLanguageModeChange('ru')}
+                            className="w-4 h-4 text-indigo-600"
+                            disabled={savingLanguageMode}
+                        />
+                        <div className="flex-1">
+                            <span className="font-medium text-gray-900">🇷🇺 Русский</span>
+                            <p className="text-sm text-gray-500">
+                                {lang === 'ru' ? 'Сайт только на русском языке' : 'Site in Russian only'}
+                            </p>
+                        </div>
+                        {languageMode === 'ru' && (
+                            <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                                {lang === 'ru' ? 'По умолчанию' : 'Default'}
+                            </span>
+                        )}
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
+                        <input
+                            type="radio"
+                            name="languageMode"
+                            value="en"
+                            checked={languageMode === 'en'}
+                            onChange={() => handleLanguageModeChange('en')}
+                            className="w-4 h-4 text-indigo-600"
+                            disabled={savingLanguageMode}
+                        />
+                        <div className="flex-1">
+                            <span className="font-medium text-gray-900">🇬🇧 English</span>
+                            <p className="text-sm text-gray-500">
+                                {lang === 'ru' ? 'Сайт только на английском языке' : 'Site in English only'}
+                            </p>
+                        </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
+                        <input
+                            type="radio"
+                            name="languageMode"
+                            value="bilingual"
+                            checked={languageMode === 'bilingual'}
+                            onChange={() => handleLanguageModeChange('bilingual')}
+                            className="w-4 h-4 text-indigo-600"
+                            disabled={savingLanguageMode}
+                        />
+                        <div className="flex-1">
+                            <span className="font-medium text-gray-900">🌐 {lang === 'ru' ? 'Двуязычный' : 'Bilingual'}</span>
+                            <p className="text-sm text-gray-500">
+                                {lang === 'ru' ? 'Пользователи могут переключать язык' : 'Users can switch language'}
+                            </p>
+                        </div>
+                    </label>
+                </div>
+            </div>
 
             {/* Follow-up Test Setting */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -134,3 +236,4 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
         </div>
     );
 }
+

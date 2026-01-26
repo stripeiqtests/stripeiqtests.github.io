@@ -4,8 +4,11 @@ import { Home } from './pages/Home';
 import { Test } from './pages/Test';
 import { PaymentSuccess } from './pages/PaymentSuccess';
 import { PaymentCancel } from './pages/PaymentCancel';
+import { Privacy } from './pages/Privacy';
+import { Terms } from './pages/Terms';
 import { LanguageProvider } from './lib/i18n';
 import { AdminProvider } from './lib/AdminContext';
+import { CookieConsent } from './components/CookieConsent';
 
 // Lazy load heavy components
 const Admin = lazy(() => import('./pages/Admin').then(m => ({ default: m.Admin })));
@@ -32,12 +35,15 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/admin/*" element={<Admin />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
               <Route path="/:slug" element={<Test />} />
               <Route path="/results/:sessionId" element={<Results />} />
               <Route path="/payment/success" element={<PaymentSuccess />} />
               <Route path="/payment/cancel" element={<PaymentCancel />} />
             </Routes>
           </Suspense>
+          <CookieConsent />
         </BrowserRouter>
       </LanguageProvider>
     </AdminProvider>
@@ -45,3 +51,4 @@ function App() {
 }
 
 export default App;
+

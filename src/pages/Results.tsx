@@ -1,23 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import type { TestSession, Test, HomeContent, ArchetypeResult } from '../lib/supabase';
+import type { TestSession, Test, ArchetypeResult } from '../lib/supabase';
 import { Brain, Lock, CreditCard, Mail, CheckCircle, ChevronDown } from 'lucide-react';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
 import { trackBeginCheckout } from '../lib/analytics';
+import { useContent } from '../lib/useContent';
 
 export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [searchParams] = useSearchParams();
   const { t, lang } = useLanguage();
   const { isAdmin } = useAdmin();
+  const { getContent, saveContent } = useContent();
 
   // Preview mode check
   const isPreview = searchParams.get('preview') === 'admin';
+  const isPaywallPreview = sessionId === 'preview-paywall' && isPreview;
 
-  // Mock data for preview mode
+  // Mock data for results preview mode (paid)
   const mockSession: TestSession = {
     id: 'preview-session',
     test_id: 'preview-test',
@@ -34,6 +37,23 @@ export function Results() {
     stripe_session_id: null,
   };
 
+  // Mock data for paywall preview mode (unpaid)
+  const mockPaywallSession: TestSession = {
+    id: 'preview-paywall-session',
+    test_id: 'preview-test',
+    email: 'demo@example.com',
+    answers: '{}',
+    is_paid: false,
+    overall_score: null,
+    analyst_score: null,
+    strategist_score: null,
+    observer_score: null,
+    intuitive_score: null,
+    created_at: new Date().toISOString(),
+    completed_at: null,
+    stripe_session_id: null,
+  };
+
   const mockTest: Test = {
     id: 'preview-test',
     title: lang === 'ru' ? 'IQ Тест (Превью)' : 'IQ Test (Preview)',
@@ -44,16 +64,21 @@ export function Results() {
     created_at: new Date().toISOString(),
   };
 
-  const [session, setSession] = useState<TestSession | null>(isPreview ? mockSession : null);
-  const [test, setTest] = useState<Test | null>(isPreview ? mockTest : null);
-  const [loading, setLoading] = useState(!isPreview);
+  const getInitialSession = () => {
+    if (isPaywallPreview) return mockPaywallSession;
+    if (isPreview) return mockSession;
+    return null;
+  };
+
+  const [session, setSession] = useState<TestSession | null>(getInitialSession());
+  const [test, setTest] = useState<Test | null>(isPreview || isPaywallPreview ? mockTest : null);
+  const [loading, setLoading] = useState(!isPreview && !isPaywallPreview);
   const [processingPayment, setProcessingPayment] = useState(false);
-  const [content, setContent] = useState<Record<string, string>>({});
   const [archetypeResult, setArchetypeResult] = useState<ArchetypeResult | null>(null);
   const [followUpTestSlug, setFollowUpTestSlug] = useState<string | null>(null);
 
   useEffect(() => {
-    loadContent();
+    loadFollowUpTestSlug();
   }, []);
 
   useEffect(() => {
@@ -62,20 +87,7 @@ export function Results() {
     }
   }, [sessionId, isPreview]);
 
-  async function loadContent() {
-    const { data } = await supabase
-      .from('home_content')
-      .select('*');
-
-    if (data) {
-      const contentMap: Record<string, string> = {};
-      data.forEach((item: HomeContent) => {
-        contentMap[item.key] = item.value;
-      });
-      setContent(contentMap);
-    }
-
-    // Load follow-up test slug from app_settings
+  async function loadFollowUpTestSlug() {
     const { data: settingsData } = await supabase
       .from('app_settings')
       .select('value')
@@ -107,22 +119,6 @@ export function Results() {
       setArchetypeResult(data);
     }
   }
-
-  async function saveContent(key: string, value: string) {
-    const { error } = await supabase
-      .from('home_content')
-      .update({ value, updated_at: new Date().toISOString() })
-      .eq('key', key);
-
-    if (error) {
-      console.error('Error saving content:', error);
-      throw error;
-    }
-
-    setContent(prev => ({ ...prev, [key]: value }));
-  }
-
-  const getContent = (key: string, fallback: string) => content[key] || fallback;
 
 
   async function loadSession() {
@@ -235,38 +231,132 @@ export function Results() {
             <div className="bg-indigo-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Lock className="w-10 h-10 text-indigo-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {lang === 'ru' ? 'Тест завершён!' : 'Test Completed!'}
-            </h1>
-            <p className="text-gray-500 mt-2">
-              {lang === 'ru' ? 'Разблокируйте ваши подробные результаты' : 'Unlock your detailed results'}
-            </p>
+            {isAdmin && isPaywallPreview ? (
+              <EditableField
+                value={getContent(lang === 'ru' ? 'paywall_title_ru' : 'paywall_title_en', lang === 'ru' ? 'Тест пройден.' : 'Test Completed.')}
+                onSave={(value) => saveContent(lang === 'ru' ? 'paywall_title_ru' : 'paywall_title_en', value)}
+                as="h1"
+                className="text-2xl font-bold text-gray-900"
+              />
+            ) : (
+              <h1 className="text-2xl font-bold text-gray-900">
+                {getContent(lang === 'ru' ? 'paywall_title_ru' : 'paywall_title_en', lang === 'ru' ? 'Тест пройден.' : 'Test Completed.')}
+              </h1>
+            )}
+            {isAdmin && isPaywallPreview ? (
+              <EditableField
+                value={getContent(lang === 'ru' ? 'paywall_subtitle_ru' : 'paywall_subtitle_en', lang === 'ru' ? 'Остался самый важный шаг.' : 'One important step remains.')}
+                onSave={(value) => saveContent(lang === 'ru' ? 'paywall_subtitle_ru' : 'paywall_subtitle_en', value)}
+                as="p"
+                className="text-lg font-medium text-indigo-600 mt-1"
+              />
+            ) : (
+              <p className="text-lg font-medium text-indigo-600 mt-1">
+                {getContent(lang === 'ru' ? 'paywall_subtitle_ru' : 'paywall_subtitle_en', lang === 'ru' ? 'Остался самый важный шаг.' : 'One important step remains.')}
+              </p>
+            )}
           </div>
 
-          {/* Preview */}
+          {/* Intro Text */}
+          <div className="text-center mb-6 text-gray-700">
+            {isAdmin && isPaywallPreview ? (
+              <EditableField
+                value={getContent(lang === 'ru' ? 'paywall_intro_ru' : 'paywall_intro_en', lang === 'ru' ? 'Ты уже показал, как ты думаешь. Теперь ты можешь понять, почему именно так — и как это влияет на твои решения, деньги, отношения и рост.' : "You've shown how you think. Now you can understand why — and how it affects your decisions, money, relationships and growth.")}
+                onSave={(value) => saveContent(lang === 'ru' ? 'paywall_intro_ru' : 'paywall_intro_en', value)}
+                as="p"
+                multiline
+              />
+            ) : (
+              <>
+                <p>
+                  {lang === 'ru'
+                    ? <>{getContent('paywall_intro_ru', 'Ты уже показал, как ты думаешь. Теперь ты можешь понять, почему именно так — и как это влияет на твои решения, деньги, отношения и рост.')}</>
+                    : <>{getContent('paywall_intro_en', "You've shown how you think. Now you can understand why — and how it affects your decisions, money, relationships and growth.")}</>
+                  }
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* Results Include */}
           <div className="bg-gray-50 rounded-xl p-6 mb-6">
-            <h3 className="font-medium text-gray-900 mb-4">{t('results.includes')}</h3>
-            <ul className="space-y-3 text-sm text-gray-600">
-              <li className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-500" />
-                {t('results.includes_score')}
+            {isAdmin && isPaywallPreview ? (
+              <EditableField
+                value={getContent(lang === 'ru' ? 'paywall_includes_title_ru' : 'paywall_includes_title_en', lang === 'ru' ? 'Внутри полного результата:' : 'Inside your full results:')}
+                onSave={(value) => saveContent(lang === 'ru' ? 'paywall_includes_title_ru' : 'paywall_includes_title_en', value)}
+                as="h3"
+                className="font-medium text-gray-900 mb-4"
+              />
+            ) : (
+              <h3 className="font-medium text-gray-900 mb-4">
+                {getContent(lang === 'ru' ? 'paywall_includes_title_ru' : 'paywall_includes_title_en', lang === 'ru' ? 'Внутри полного результата:' : 'Inside your full results:')}
+              </h3>
+            )}
+            <ul className="space-y-3 text-sm text-gray-700">
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                {isAdmin && isPaywallPreview ? (
+                  <EditableField
+                    value={getContent(lang === 'ru' ? 'paywall_item1_ru' : 'paywall_item1_en', lang === 'ru' ? 'твой тип мышления и сильные стороны' : 'your thinking type and strengths')}
+                    onSave={(value) => saveContent(lang === 'ru' ? 'paywall_item1_ru' : 'paywall_item1_en', value)}
+                    as="span"
+                  />
+                ) : (
+                  getContent(lang === 'ru' ? 'paywall_item1_ru' : 'paywall_item1_en', lang === 'ru' ? 'твой тип мышления и сильные стороны' : 'your thinking type and strengths')
+                )}
               </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-500" />
-                {t('results.includes_dimensions')}
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                {isAdmin && isPaywallPreview ? (
+                  <EditableField
+                    value={getContent(lang === 'ru' ? 'paywall_item2_ru' : 'paywall_item2_en', lang === 'ru' ? 'где ты действуешь точно, а где теряешь энергию' : 'where you act precisely, and where you lose energy')}
+                    onSave={(value) => saveContent(lang === 'ru' ? 'paywall_item2_ru' : 'paywall_item2_en', value)}
+                    as="span"
+                  />
+                ) : (
+                  getContent(lang === 'ru' ? 'paywall_item2_ru' : 'paywall_item2_en', lang === 'ru' ? 'где ты действуешь точно, а где теряешь энергию' : 'where you act precisely, and where you lose energy')
+                )}
               </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-500" />
-                {t('results.includes_analysis')}
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                {isAdmin && isPaywallPreview ? (
+                  <EditableField
+                    value={getContent(lang === 'ru' ? 'paywall_item3_ru' : 'paywall_item3_en', lang === 'ru' ? 'скрытые ограничения, которые мешают идти быстрее' : 'hidden limitations that hold you back')}
+                    onSave={(value) => saveContent(lang === 'ru' ? 'paywall_item3_ru' : 'paywall_item3_en', value)}
+                    as="span"
+                  />
+                ) : (
+                  getContent(lang === 'ru' ? 'paywall_item3_ru' : 'paywall_item3_en', lang === 'ru' ? 'скрытые ограничения, которые мешают идти быстрее' : 'hidden limitations that hold you back')
+                )}
               </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-500" />
-                {t('results.includes_career')}
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                {isAdmin && isPaywallPreview ? (
+                  <EditableField
+                    value={getContent(lang === 'ru' ? 'paywall_item4_ru' : 'paywall_item4_en', lang === 'ru' ? 'персональные рекомендации под твой стиль мышления' : 'personalized recommendations for your thinking style')}
+                    onSave={(value) => saveContent(lang === 'ru' ? 'paywall_item4_ru' : 'paywall_item4_en', value)}
+                    as="span"
+                  />
+                ) : (
+                  getContent(lang === 'ru' ? 'paywall_item4_ru' : 'paywall_item4_en', lang === 'ru' ? 'персональные рекомендации под твой стиль мышления' : 'personalized recommendations for your thinking style')
+                )}
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                {isAdmin && isPaywallPreview ? (
+                  <EditableField
+                    value={getContent(lang === 'ru' ? 'paywall_item5_ru' : 'paywall_item5_en', lang === 'ru' ? 'разбор, который можно сохранить и вернуться к нему' : 'analysis you can save and return to')}
+                    onSave={(value) => saveContent(lang === 'ru' ? 'paywall_item5_ru' : 'paywall_item5_en', value)}
+                    as="span"
+                  />
+                ) : (
+                  getContent(lang === 'ru' ? 'paywall_item5_ru' : 'paywall_item5_en', lang === 'ru' ? 'разбор, который можно сохранить и вернуться к нему' : 'analysis you can save and return to')
+                )}
               </li>
               {session.email && (
-                <li className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-green-500" />
-                  {t('results.includes_email')}
+                <li className="flex items-start gap-2">
+                  <Mail className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  {lang === 'ru' ? 'копия результатов на email' : 'email copy of results'}
                 </li>
               )}
             </ul>
@@ -285,7 +375,7 @@ export function Results() {
           {/* Payment Button */}
           <button
             onClick={handlePayment}
-            disabled={processingPayment}
+            disabled={processingPayment || isPaywallPreview}
             className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-4 rounded-xl font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
           >
             {processingPayment ? (
@@ -296,7 +386,16 @@ export function Results() {
             ) : (
               <>
                 <CreditCard className="w-5 h-5" />
-                {t('results.unlock')}
+                {isAdmin && isPaywallPreview ? (
+                  <EditableField
+                    value={getContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', lang === 'ru' ? 'Разблокировать мой результат' : 'Unlock My Results')}
+                    onSave={(value) => saveContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', value)}
+                    as="span"
+                    className="text-white"
+                  />
+                ) : (
+                  getContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', lang === 'ru' ? 'Разблокировать мой результат' : 'Unlock My Results')
+                )}
               </>
             )}
           </button>

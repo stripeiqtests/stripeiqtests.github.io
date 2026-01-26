@@ -49,7 +49,11 @@ export function AdminArchetypesTab() {
     const [editForm, setEditForm] = useState<Partial<ArchetypeResult>>({});
     const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [editLang, setEditLang] = useState<'ru' | 'en'>('ru');
-    const { lang } = useLanguage();
+    const { lang, languageMode } = useLanguage();
+
+    // Determine which language tabs to show based on mode
+    const showRuTab = languageMode === 'ru' || languageMode === 'bilingual';
+    const showEnTab = languageMode === 'en' || languageMode === 'bilingual';
 
     useEffect(() => {
         loadArchetypes();
@@ -83,7 +87,8 @@ export function AdminArchetypesTab() {
             content_ru: '',
             content_en: '',
         });
-        setEditLang('ru');
+        // Set initial edit language based on mode
+        setEditLang(languageMode === 'en' ? 'en' : 'ru');
     }
 
     async function handleSave() {
@@ -210,7 +215,7 @@ export function AdminArchetypesTab() {
                         >
                             <div
                                 className={`${info.bg} px-4 py-3 flex items-center justify-between cursor-pointer`}
-                                onClick={() => !isEditing && startEditing(dimension)}
+                                onClick={() => isEditing ? setEditingDimension(null) : startEditing(dimension)}
                             >
                                 <div className="flex items-center gap-3">
                                     <Icon className={`w-5 h-5 ${info.color}`} />
@@ -241,27 +246,33 @@ export function AdminArchetypesTab() {
 
                             {isEditing && (
                                 <div className="p-4 bg-white space-y-4">
-                                    {/* RU / EN Tabs */}
-                                    <div className="flex gap-2 border-b border-gray-200">
-                                        <button
-                                            onClick={() => setEditLang('ru')}
-                                            className={`px-4 py-2 font-medium transition-colors ${editLang === 'ru'
-                                                    ? 'text-indigo-600 border-b-2 border-indigo-600'
-                                                    : 'text-gray-500 hover:text-gray-700'
-                                                }`}
-                                        >
-                                            🇷🇺 Русский
-                                        </button>
-                                        <button
-                                            onClick={() => setEditLang('en')}
-                                            className={`px-4 py-2 font-medium transition-colors ${editLang === 'en'
-                                                    ? 'text-indigo-600 border-b-2 border-indigo-600'
-                                                    : 'text-gray-500 hover:text-gray-700'
-                                                }`}
-                                        >
-                                            🇬🇧 English
-                                        </button>
-                                    </div>
+                                    {/* RU / EN Tabs - only show if bilingual mode */}
+                                    {languageMode === 'bilingual' && (
+                                        <div className="flex gap-2 border-b border-gray-200">
+                                            {showRuTab && (
+                                                <button
+                                                    onClick={() => setEditLang('ru')}
+                                                    className={`px-4 py-2 font-medium transition-colors ${editLang === 'ru'
+                                                        ? 'text-indigo-600 border-b-2 border-indigo-600'
+                                                        : 'text-gray-500 hover:text-gray-700'
+                                                        }`}
+                                                >
+                                                    🇷🇺 Русский
+                                                </button>
+                                            )}
+                                            {showEnTab && (
+                                                <button
+                                                    onClick={() => setEditLang('en')}
+                                                    className={`px-4 py-2 font-medium transition-colors ${editLang === 'en'
+                                                        ? 'text-indigo-600 border-b-2 border-indigo-600'
+                                                        : 'text-gray-500 hover:text-gray-700'
+                                                        }`}
+                                                >
+                                                    🇬🇧 English
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* Title */}
                                     <div>

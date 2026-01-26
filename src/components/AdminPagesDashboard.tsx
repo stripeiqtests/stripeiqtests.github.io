@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowLeft, CheckCircle, XCircle, BarChart3 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, CheckCircle, XCircle, BarChart3, Lock } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '../lib/i18n';
 
@@ -11,13 +11,15 @@ export function AdminPagesDashboard() {
     const isViewingSuccess = path.includes('/admin/pages/success');
     const isViewingCancel = path.includes('/admin/pages/cancel');
     const isViewingResults = path.includes('/admin/pages/results');
-    const isViewingPreview = isViewingSuccess || isViewingCancel || isViewingResults;
+    const isViewingPaywall = path.includes('/admin/pages/paywall');
+    const isViewingPreview = isViewingSuccess || isViewingCancel || isViewingResults || isViewingPaywall;
 
     // Map to actual page URLs
     const getIframeUrl = () => {
         if (isViewingSuccess) return '/payment/success?preview=admin&session_id=demo';
         if (isViewingCancel) return '/payment/cancel?preview=admin';
         if (isViewingResults) return '/results/preview?preview=admin';
+        if (isViewingPaywall) return '/results/preview-paywall?preview=admin';
         return '';
     };
 
@@ -37,6 +39,14 @@ export function AdminPagesDashboard() {
             icon: XCircle,
             descriptionKey: 'admin.payment_cancel_desc',
             color: 'bg-red-50 text-red-600',
+        },
+        {
+            id: 'paywall',
+            titleKey: 'admin.paywall',
+            path: '/admin/pages/paywall',
+            icon: Lock,
+            descriptionKey: 'admin.paywall_desc',
+            color: 'bg-amber-50 text-amber-600',
         },
         {
             id: 'results',

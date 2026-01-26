@@ -1,11 +1,16 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from './supabase';
 
 type Language = 'ru' | 'en';
+type LanguageMode = 'ru' | 'en' | 'bilingual';
 
 interface LanguageContextType {
     lang: Language;
     setLang: (lang: Language) => void;
     t: (key: string) => string;
+    languageMode: LanguageMode;
+    setLanguageMode: (mode: LanguageMode) => Promise<void>;
+    languageModeLoading: boolean;
 }
 
 const translations = {
@@ -114,6 +119,8 @@ const translations = {
         'admin.payment_success_desc': 'Сообщения об успешной оплате',
         'admin.payment_cancel_desc': 'Сообщения об отмене оплаты',
         'admin.results_page_desc': 'Требуется реальная сессия теста',
+        'admin.paywall': 'Экран оплаты',
+        'admin.paywall_desc': 'Текст на странице до оплаты',
         'admin.results_requires_session': 'Страница результатов требует реальной сессии теста. Пройдите тест чтобы увидеть эту страницу.',
         // Test form
         'admin.test_title': 'Название теста',
@@ -240,6 +247,8 @@ const translations = {
         'admin.payment_success_desc': 'Success messages after payment',
         'admin.payment_cancel_desc': 'Cancellation messages',
         'admin.results_page_desc': 'Requires an actual test session',
+        'admin.paywall': 'Paywall',
+        'admin.paywall_desc': 'Pre-payment page text',
         'admin.results_requires_session': 'Results page requires an actual test session. Complete a test to view this page.',
         // Test form
         'admin.test_title': 'Test Title',
@@ -266,14 +275,79 @@ const translations = {
 const LanguageContext = createContext<LanguageContextType | null>(null);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-    const [lang, setLangState] = useState<Language>(() => {
-        const saved = localStorage.getItem('lang');
-        return (saved === 'en' || saved === 'ru') ? saved : 'ru';
-    });
+    const [languageMode, setLanguageModeState] = useState<LanguageMode>('ru');
+    const [languageModeLoading, setLanguageModeLoading] = useState(true);
+    const [lang, setLangState] = useState<Language>('ru');
+
+    // Load language mode from database on mount
+    useEffect(() => {
+        async function loadLanguageMode() {
+            try {
+                const { data } = await supabase
+                    .from('app_settings')
+                    .select('value')
+                    .eq('key', 'language_mode')
+                    .single();
+
+                const mode = (data?.value as LanguageMode) || 'ru';
+                setLanguageModeState(mode);
+
+                // Set language based on mode
+                if (mode === 'bilingual') {
+                    // In bilingual mode, respect user's saved preference
+                    const saved = localStorage.getItem('lang');
+                    setLangState((saved === 'en' || saved === 'ru') ? saved : 'ru');
+                } else {
+                    // In single-language mode, force that language
+                    setLangState(mode);
+                    localStorage.setItem('lang', mode);
+                }
+            } catch (error) {
+                console.error('Error loading language mode:', error);
+                // Default to Russian
+                setLangState('ru');
+            } finally {
+                setLanguageModeLoading(false);
+            }
+        }
+
+        loadLanguageMode();
+    }, []);
 
     const setLang = (newLang: Language) => {
-        setLangState(newLang);
-        localStorage.setItem('lang', newLang);
+        // Only allow switching in bilingual mode
+        if (languageMode === 'bilingual') {
+            setLangState(newLang);
+            localStorage.setItem('lang', newLang);
+        }
+    };
+
+    const setLanguageMode = async (mode: LanguageMode) => {
+        try {
+            // Update in database
+            const { error: updateError } = await supabase
+                .from('app_settings')
+                .update({ value: mode })
+                .eq('key', 'language_mode');
+
+            if (updateError) {
+                // Try insert if update fails
+                await supabase
+                    .from('app_settings')
+                    .insert({ key: 'language_mode', value: mode });
+            }
+
+            setLanguageModeState(mode);
+
+            // Update current language based on new mode
+            if (mode !== 'bilingual') {
+                setLangState(mode);
+                localStorage.setItem('lang', mode);
+            }
+        } catch (error) {
+            console.error('Error saving language mode:', error);
+            throw error;
+        }
     };
 
     const t = (key: string): string => {
@@ -281,7 +355,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <LanguageContext.Provider value={{ lang, setLang, t }}>
+        <LanguageContext.Provider value={{ lang, setLang, t, languageMode, setLanguageMode, languageModeLoading }}>
             {children}
         </LanguageContext.Provider>
     );
@@ -295,9 +369,14 @@ export function useLanguage() {
     return context;
 }
 
-// Language switcher component
+// Language switcher component - only visible in bilingual mode
 export function LanguageSwitcher() {
-    const { lang, setLang } = useLanguage();
+    const { lang, setLang, languageMode, languageModeLoading } = useLanguage();
+
+    // Hide switcher if not in bilingual mode or still loading
+    if (languageModeLoading || languageMode !== 'bilingual') {
+        return null;
+    }
 
     return (
         <div className="language-switcher">
