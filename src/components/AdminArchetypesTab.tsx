@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { ArchetypeResult } from '../lib/supabase';
-import { Save, Brain, Target, Eye, Sparkles, AlertCircle, CheckCircle } from 'lucide-react';
+import { Save, Brain, Target, Eye, Sparkles, AlertCircle, CheckCircle, ChevronDown } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
 
 const DIMENSION_INFO = {
@@ -48,6 +48,7 @@ export function AdminArchetypesTab() {
     const [editingDimension, setEditingDimension] = useState<Dimension | null>(null);
     const [editForm, setEditForm] = useState<Partial<ArchetypeResult>>({});
     const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [editLang, setEditLang] = useState<'ru' | 'en'>('ru');
     const { lang } = useLanguage();
 
     useEffect(() => {
@@ -63,7 +64,6 @@ export function AdminArchetypesTab() {
 
         if (error) {
             console.error('Error loading archetypes:', error);
-            // If table doesn't exist, we'll create default entries
             if (error.code === '42P01') {
                 console.log('archetype_results table does not exist - needs to be created');
             }
@@ -83,6 +83,7 @@ export function AdminArchetypesTab() {
             content_ru: '',
             content_en: '',
         });
+        setEditLang('ru');
     }
 
     async function handleSave() {
@@ -95,7 +96,6 @@ export function AdminArchetypesTab() {
 
         try {
             if (existing) {
-                // Update existing
                 const { error } = await supabase
                     .from('archetype_results')
                     .update({
@@ -109,7 +109,6 @@ export function AdminArchetypesTab() {
 
                 if (error) throw error;
             } else {
-                // Insert new
                 const { error } = await supabase
                     .from('archetype_results')
                     .insert({
@@ -139,6 +138,40 @@ export function AdminArchetypesTab() {
 
         setSaving(null);
     }
+
+    // Markdown-like renderer for preview
+    const renderPreviewContent = (text: string) => {
+        const lines = text.split('\n');
+        return lines.map((line, index) => {
+            const processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+            if (line.trim() === '---') {
+                return <hr key={index} className="my-4 border-gray-300" />;
+            }
+
+            if (line.trim().startsWith('•')) {
+                return (
+                    <li
+                        key={index}
+                        className="ml-4 text-gray-700"
+                        dangerouslySetInnerHTML={{ __html: processedLine.replace('•', '').trim() }}
+                    />
+                );
+            }
+
+            if (line.trim() === '') {
+                return <br key={index} />;
+            }
+
+            return (
+                <p
+                    key={index}
+                    className="text-gray-700"
+                    dangerouslySetInnerHTML={{ __html: processedLine }}
+                />
+            );
+        });
+    };
 
     if (loading) {
         return (
@@ -208,63 +241,65 @@ export function AdminArchetypesTab() {
 
                             {isEditing && (
                                 <div className="p-4 bg-white space-y-4">
-                                    {/* Title RU */}
+                                    {/* RU / EN Tabs */}
+                                    <div className="flex gap-2 border-b border-gray-200">
+                                        <button
+                                            onClick={() => setEditLang('ru')}
+                                            className={`px-4 py-2 font-medium transition-colors ${editLang === 'ru'
+                                                    ? 'text-indigo-600 border-b-2 border-indigo-600'
+                                                    : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                        >
+                                            🇷🇺 Русский
+                                        </button>
+                                        <button
+                                            onClick={() => setEditLang('en')}
+                                            className={`px-4 py-2 font-medium transition-colors ${editLang === 'en'
+                                                    ? 'text-indigo-600 border-b-2 border-indigo-600'
+                                                    : 'text-gray-500 hover:text-gray-700'
+                                                }`}
+                                        >
+                                            🇬🇧 English
+                                        </button>
+                                    </div>
+
+                                    {/* Title */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Заголовок (RU)
+                                            {editLang === 'ru' ? 'Заголовок' : 'Title'}
                                         </label>
                                         <input
                                             type="text"
-                                            value={editForm.title_ru || ''}
-                                            onChange={(e) => setEditForm({ ...editForm, title_ru: e.target.value })}
+                                            value={editLang === 'ru' ? (editForm.title_ru || '') : (editForm.title_en || '')}
+                                            onChange={(e) => setEditForm({
+                                                ...editForm,
+                                                [editLang === 'ru' ? 'title_ru' : 'title_en']: e.target.value
+                                            })}
                                             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                            placeholder="🧠 ОБРАЗ МЫШЛЕНИЯ: АНАЛИТИК"
+                                            placeholder={editLang === 'ru' ? '🧠 ОБРАЗ МЫШЛЕНИЯ: АНАЛИТИК' : '🧠 THINKING STYLE: ANALYST'}
                                         />
                                     </div>
 
-                                    {/* Title EN */}
+                                    {/* Content */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Title (EN)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={editForm.title_en || ''}
-                                            onChange={(e) => setEditForm({ ...editForm, title_en: e.target.value })}
-                                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                            placeholder="🧠 THINKING STYLE: ANALYST"
-                                        />
-                                    </div>
-
-                                    {/* Content RU */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Содержимое (RU)
+                                            {editLang === 'ru' ? 'Содержимое' : 'Content'}
                                         </label>
                                         <textarea
-                                            value={editForm.content_ru || ''}
-                                            onChange={(e) => setEditForm({ ...editForm, content_ru: e.target.value })}
+                                            value={editLang === 'ru' ? (editForm.content_ru || '') : (editForm.content_en || '')}
+                                            onChange={(e) => setEditForm({
+                                                ...editForm,
+                                                [editLang === 'ru' ? 'content_ru' : 'content_en']: e.target.value
+                                            })}
                                             rows={12}
                                             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
-                                            placeholder="Полное описание результата на русском языке..."
+                                            placeholder={editLang === 'ru' ? 'Полное описание результата...' : 'Full result description...'}
                                         />
                                         <p className="text-xs text-gray-500 mt-1">
-                                            Используйте **текст** для жирного, *текст* для курсива
+                                            {editLang === 'ru'
+                                                ? 'Используйте **текст** для жирного, • для списков, --- для разделителя'
+                                                : 'Use **text** for bold, • for lists, --- for separator'}
                                         </p>
-                                    </div>
-
-                                    {/* Content EN */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Content (EN)
-                                        </label>
-                                        <textarea
-                                            value={editForm.content_en || ''}
-                                            onChange={(e) => setEditForm({ ...editForm, content_en: e.target.value })}
-                                            rows={12}
-                                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
-                                            placeholder="Full result description in English..."
-                                        />
                                     </div>
 
                                     {/* Save Status */}
@@ -298,6 +333,29 @@ export function AdminArchetypesTab() {
                                         >
                                             {lang === 'ru' ? 'Отмена' : 'Cancel'}
                                         </button>
+                                    </div>
+
+                                    {/* Preview Section */}
+                                    <div className="mt-6 pt-6 border-t border-gray-200">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="font-semibold text-gray-900">
+                                                {lang === 'ru' ? 'Предпросмотр' : 'Preview'}
+                                            </h4>
+                                            <span className="text-sm text-gray-500">
+                                                {editLang === 'ru' ? '🇷🇺 Русский' : '🇬🇧 English'}
+                                            </span>
+                                        </div>
+                                        <div className={`rounded-xl border-2 ${info.border} ${info.bg} overflow-hidden`}>
+                                            <div className="px-4 py-3 flex items-center gap-2">
+                                                <h3 className={`text-lg font-bold ${info.color}`}>
+                                                    {editLang === 'ru' ? editForm.title_ru : editForm.title_en}
+                                                </h3>
+                                                <ChevronDown className={`w-5 h-5 ${info.color} rotate-180`} />
+                                            </div>
+                                            <div className="px-4 pb-4 bg-white/50 space-y-2 text-sm leading-relaxed">
+                                                {renderPreviewContent(editLang === 'ru' ? (editForm.content_ru || '') : (editForm.content_en || ''))}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             )}
