@@ -6,6 +6,7 @@ import { useLanguage } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
 import type { HomeContent } from '../lib/supabase';
+import { trackPurchase } from '../lib/analytics';
 
 export function PaymentSuccess() {
   const [searchParams] = useSearchParams();
@@ -91,6 +92,8 @@ export function PaymentSuccess() {
 
       // Redirect to results page
       if (data?.testSessionId) {
+        // Track successful purchase
+        trackPurchase(data.testId || '', data.testSessionId, data.amountPaid || 500);
         navigate(`/results/${data.testSessionId}`);
       } else {
         throw new Error('No test session ID returned');

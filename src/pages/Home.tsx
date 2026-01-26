@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Test, HomeContent } from '../lib/supabase';
-import { Brain, Clock, Target, Sparkles, Settings, Edit2 } from 'lucide-react';
+import { Brain, Clock, Target, Sparkles, Settings, Edit2, BookOpen, ChevronDown } from 'lucide-react';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
@@ -198,6 +198,120 @@ export function Home() {
             />
           </div>
         </div>
+      </section>
+
+      {/* Methodology (collapsible) */}
+      <section className="max-w-4xl mx-auto px-4 pb-8">
+        <details className="group bg-white rounded-2xl shadow-sm border border-gray-100" open>
+          <summary className="flex items-center justify-between px-6 py-4 cursor-pointer select-none">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-indigo-600" />
+              <span className="font-semibold text-gray-900">На чём основан этот тест</span>
+            </div>
+            <div className="text-gray-400 group-open:rotate-180 transition-transform">
+              <ChevronDown className="w-5 h-5" />
+            </div>
+          </summary>
+          <div className="px-6 pb-6 pt-2 space-y-3 text-sm leading-relaxed text-gray-700">
+            <p>
+              Этот тест не является медицинской или клинической диагностикой. Он создан как интерпретационный инструмент,
+              помогающий понять, какой способ мышления у вас является ведущим и через какие архетипические образы он чаще всего проявляется.
+            </p>
+
+            {/* Sub-section 1 */}
+            <details className="group/sub border border-gray-100 rounded-lg">
+              <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">🧠 Что именно мы измеряем</h4>
+                <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
+              </summary>
+              <div className="px-4 pb-4 space-y-2">
+                <p>В основе теста лежит когнитивный стиль мышления — то, как человек обрабатывает информацию, принимает решения и ориентируется в реальности.</p>
+                <p className="text-gray-600">В психологии выделяют когнитивные стили:</p>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>аналитический</li>
+                  <li>стратегический</li>
+                  <li>наблюдательный</li>
+                  <li>интуитивный</li>
+                </ul>
+                <p>Это не черты характера и не «типы личности», а способы мышления, которые могут меняться и сочетаться.</p>
+              </div>
+            </details>
+
+            {/* Sub-section 2 */}
+            <details className="group/sub border border-gray-100 rounded-lg">
+              <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">🧩 Как здесь появляются архетипы</h4>
+                <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
+              </summary>
+              <div className="px-4 pb-4 space-y-2">
+                <p>Карл Юнг не связывал напрямую тип мышления с конкретным архетипом. В юнгианской психологии:</p>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>архетипы — модели поведения, энергии и ролей;</li>
+                  <li>а не описание интеллекта или логики.</li>
+                </ul>
+                <p>Связь «тип мышления → архетип» — интерпретационная модель.</p>
+              </div>
+            </details>
+
+            {/* Sub-section 3 */}
+            <details className="group/sub border border-gray-100 rounded-lg">
+              <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">🧱 На что мы опираемся</h4>
+                <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
+              </summary>
+              <div className="px-4 pb-4 space-y-3">
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  <p className="font-medium text-gray-900">1. Аналитическая психология К. Г. Юнга</p>
+                  <p className="text-gray-700">Базовые функции: мышление, чувство, интуиция, ощущение. Архетипы — формы проявления этих функций.</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  <p className="font-medium text-gray-900">2. Современная психология мышления</p>
+                  <p className="text-gray-700">Когнитивные стили коррелируют с моделями поведения. Аналитическое мышление чаще связано с контролем, иерархией, ответственностью, структурой — поэтому сочетается с архетипами Короля/Королевы или Мага.</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  <p className="font-medium text-gray-900">3. Культурная и архетипическая психология</p>
+                  <p className="text-gray-700">(Joseph Campbell, Carol S. Pearson). Устойчивые образы: Король/Королева — порядок, Воин — действие, Маг — знание, Трикстер — интуиция и игра.</p>
+                </div>
+              </div>
+            </details>
+
+            {/* Sub-section 4 */}
+            <details className="group/sub border border-gray-100 rounded-lg">
+              <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">🔍 Как проверить самостоятельно</h4>
+                <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
+              </summary>
+              <div className="px-4 pb-4 space-y-2">
+                <p className="text-gray-700">Ищите по запросам:</p>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li><em className="text-indigo-600 not-italic bg-indigo-50 px-1.5 py-0.5 rounded">cognitive styles psychology</em></li>
+                  <li><em className="text-indigo-600 not-italic bg-indigo-50 px-1.5 py-0.5 rounded">Jung psychological functions</em></li>
+                  <li><em className="text-indigo-600 not-italic bg-indigo-50 px-1.5 py-0.5 rounded">archetypes king magician warrior trickster</em></li>
+                  <li><em className="text-indigo-600 not-italic bg-indigo-50 px-1.5 py-0.5 rounded">Carol Pearson archetypes</em></li>
+                  <li><em className="text-indigo-600 not-italic bg-indigo-50 px-1.5 py-0.5 rounded">Joseph Campbell archetypal psychology</em></li>
+                </ul>
+              </div>
+            </details>
+
+            {/* Sub-section 5 */}
+            <details className="group/sub border border-gray-100 rounded-lg">
+              <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-900 flex items-center gap-2">🧭 Как воспринимать результаты</h4>
+                <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
+              </summary>
+              <div className="px-4 pb-4 space-y-2">
+                <p>Результаты показывают ваш ведущий способ мышления и архетипическое направление, через которое он проявляется.</p>
+                <p className="text-gray-700">Обычно у человека:</p>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>1 основной архетип</li>
+                  <li>1–2 поддерживающих</li>
+                  <li>1 архетип в тени</li>
+                </ul>
+                <p>За более точной картиной — углублённый тест.</p>
+              </div>
+            </details>
+          </div>
+        </details>
       </section>
 
       {/* Available Tests */}

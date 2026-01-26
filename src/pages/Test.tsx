@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import type { Test as TestType, Question } from '../lib/supabase';
 import { Brain, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
+import { trackTestStart, trackTestComplete } from '../lib/analytics';
 
 export function Test() {
   const { slug } = useParams<{ slug: string }>();
@@ -51,6 +52,8 @@ export function Test() {
 
     if (!questionsError && questionsData) {
       setQuestions(questionsData);
+      // Track test start event
+      trackTestStart(testData.id, testData.title);
     }
 
     setLoading(false);
@@ -136,6 +139,9 @@ export function Test() {
         completed_at: new Date().toISOString(),
       })
       .eq('id', session.id);
+
+    // Track test complete event
+    trackTestComplete(test.id, test.title, questions.length);
 
     // Navigate to results page
     navigate(`/results/${session.id}`);
@@ -269,17 +275,6 @@ export function Test() {
             {currentQuestion.question_text}
           </h2>
 
-          {/* Question Image */}
-          {currentQuestion.image_url && (
-            <div className="mb-6">
-              <img
-                src={currentQuestion.image_url}
-                alt="Question"
-                className="max-w-full h-auto rounded-lg border border-gray-200"
-              />
-            </div>
-          )}
-
           {/* Options */}
           <div className="space-y-3">
             {options.map((option) => (
@@ -303,6 +298,17 @@ export function Test() {
               </button>
             ))}
           </div>
+
+          {/* Question Image - displayed after options */}
+          {currentQuestion.image_url && (
+            <div className="mt-6">
+              <img
+                src={currentQuestion.image_url}
+                alt="Question"
+                className="max-w-full h-auto rounded-lg border border-gray-200"
+              />
+            </div>
+          )}
         </div>
 
         {/* Navigation */}

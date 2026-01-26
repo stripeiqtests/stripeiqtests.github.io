@@ -56,3 +56,13 @@ export interface HomeContent {
   value: string;
   updated_at: string;
 }
+
+export interface ArchetypeResult {
+  id: string;
+  dimension: 'analyst' | 'strategist' | 'observer' | 'intuitive';
+  title_ru: string;
+  title_en: string;
+  content_ru: string; // Full rich text content in Russian
+  content_en: string; // Full rich text content in English
+  updated_at: string;
+}

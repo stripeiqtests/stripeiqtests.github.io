@@ -6,6 +6,7 @@ import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
 import { supabase } from '../lib/supabase';
 import type { HomeContent } from '../lib/supabase';
+import { trackPaymentCancel } from '../lib/analytics';
 
 export function PaymentCancel() {
   const [searchParams] = useSearchParams();
@@ -17,6 +18,11 @@ export function PaymentCancel() {
   useEffect(() => {
     loadContent();
   }, [lang]);
+
+  // Track payment cancellation event
+  useEffect(() => {
+    trackPaymentCancel();
+  }, []);
 
   async function loadContent() {
     const { data } = await supabase

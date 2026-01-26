@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import type { TestSession, Test, HomeContent } from '../lib/supabase';
-import { Brain, Lock, CreditCard, Mail, CheckCircle } from 'lucide-react';
+import type { TestSession, Test, HomeContent, ArchetypeResult } from '../lib/supabase';
+import { Brain, Lock, CreditCard, Mail, CheckCircle, ChevronDown } from 'lucide-react';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
+import { trackBeginCheckout } from '../lib/analytics';
 
 export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -48,6 +49,7 @@ export function Results() {
   const [loading, setLoading] = useState(!isPreview);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [content, setContent] = useState<Record<string, string>>({});
+  const [archetypeResult, setArchetypeResult] = useState<ArchetypeResult | null>(null);
 
   useEffect(() => {
     loadContent();
@@ -70,6 +72,27 @@ export function Results() {
         contentMap[item.key] = item.value;
       });
       setContent(contentMap);
+    }
+  }
+
+  // Load archetype result based on strongest dimension
+  async function loadArchetypeResult(sess: TestSession) {
+    const scores = [
+      { dimension: 'analyst', score: sess.analyst_score || 0 },
+      { dimension: 'strategist', score: sess.strategist_score || 0 },
+      { dimension: 'observer', score: sess.observer_score || 0 },
+      { dimension: 'intuitive', score: sess.intuitive_score || 0 },
+    ];
+    const strongest = scores.reduce((max, s) => s.score > max.score ? s : max);
+
+    const { data, error } = await supabase
+      .from('archetype_results')
+      .select('*')
+      .eq('dimension', strongest.dimension)
+      .single();
+
+    if (!error && data) {
+      setArchetypeResult(data);
     }
   }
 
@@ -104,6 +127,9 @@ export function Results() {
 
     setSession(sessionData);
 
+    // Load archetype result based on scores
+    loadArchetypeResult(sessionData);
+
     // Load test info
     const { data: testData } = await supabase
       .from('tests')
@@ -122,6 +148,9 @@ export function Results() {
     if (!session || !test) return;
 
     setProcessingPayment(true);
+
+    // Track checkout initiation
+    trackBeginCheckout(test.id, test.price_cents);
 
     try {
       // Call Supabase Edge Function to create Stripe checkout session
@@ -439,6 +468,14 @@ export function Results() {
           </p>
         </div>
 
+        {/* Archetype Result Block */}
+        {archetypeResult && (
+          <ArchetypeResultSection
+            archetype={archetypeResult}
+            lang={lang}
+          />
+        )}
+
         {/* Email confirmation */}
         {session.email && (
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center gap-3">
@@ -575,3 +612,79 @@ function getProfileDescription(session: TestSession, lang: string): string {
   const prefix = lang === 'ru' ? `Ваша сильнейшая сторона — ${strongest.name}. ` : `Your strongest dimension is ${strongest.name}. `;
   return prefix + descriptions[strongest.key][lang as 'ru' | 'en'];
 }
+
+// Archetype Result Section Component
+function ArchetypeResultSection({
+  archetype,
+  lang
+}: {
+  archetype: ArchetypeResult;
+  lang: string;
+}) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  const title = lang === 'ru' ? archetype.title_ru : archetype.title_en;
+  const content = lang === 'ru' ? archetype.content_ru : archetype.content_en;
+
+  // Simple markdown-like renderer for content
+  const renderContent = (text: string) => {
+    const lines = text.split('\n');
+    return lines.map((line, index) => {
+      // Bold text with **
+      const processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+      // Bullet points
+      if (line.trim().startsWith('•')) {
+        return (
+          <li
+            key={index}
+            className="ml-4 text-gray-700"
+            dangerouslySetInnerHTML={{ __html: processedLine.replace('•', '').trim() }}
+          />
+        );
+      }
+
+      // Empty lines
+      if (line.trim() === '') {
+        return <br key={index} />;
+      }
+
+      // Regular paragraph
+      return (
+        <p
+          key={index}
+          className="text-gray-700"
+          dangerouslySetInnerHTML={{ __html: processedLine }}
+        />
+      );
+    });
+  };
+
+  const colors: Record<string, { bg: string; border: string; title: string }> = {
+    analyst: { bg: 'bg-blue-50', border: 'border-blue-200', title: 'text-blue-700' },
+    strategist: { bg: 'bg-purple-50', border: 'border-purple-200', title: 'text-purple-700' },
+    observer: { bg: 'bg-green-50', border: 'border-green-200', title: 'text-green-700' },
+    intuitive: { bg: 'bg-amber-50', border: 'border-amber-200', title: 'text-amber-700' },
+  };
+
+  const colorClass = colors[archetype.dimension] || colors.analyst;
+
+  return (
+    <div className={`rounded-2xl border-2 ${colorClass.border} ${colorClass.bg} mb-6 overflow-hidden`}>
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-6 py-4 flex items-center justify-between text-left"
+      >
+        <h3 className={`text-lg font-bold ${colorClass.title}`}>{title}</h3>
+        <ChevronDown className={`w-5 h-5 ${colorClass.title} transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isExpanded && (
+        <div className="px-6 pb-6 space-y-2 text-sm leading-relaxed">
+          {renderContent(content)}
+        </div>
+      )}
+    </div>
+  );
+}
+
