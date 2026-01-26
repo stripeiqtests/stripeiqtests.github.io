@@ -29,3 +29,6 @@ pnpm-debug.log*
 # Lock files (optional)
 # package-lock.json
 # yarn.lock
+
+# Private chat export folder
+ChatExport_*

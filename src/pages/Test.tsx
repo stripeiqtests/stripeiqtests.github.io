@@ -281,7 +281,7 @@ export function Test() {
               <button
                 key={option.label}
                 onClick={() => handleAnswer(option.label)}
-                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${selectedAnswer === option.label
+                className={`w-full text-left p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedAnswer === option.label
                   ? 'border-indigo-600 bg-indigo-50'
                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                   }`}
@@ -316,7 +316,7 @@ export function Test() {
           <button
             onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
             disabled={currentIndex === 0}
-            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <ChevronLeft className="w-5 h-5" />
             {lang === 'ru' ? 'Назад' : 'Previous'}
@@ -326,7 +326,7 @@ export function Test() {
             <button
               onClick={() => setShowEmailPrompt(true)}
               disabled={!allAnswered}
-              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <Check className="w-5 h-5" />
               {lang === 'ru' ? 'Завершить тест' : 'Submit Test'}
@@ -334,7 +334,7 @@ export function Test() {
           ) : (
             <button
               onClick={() => setCurrentIndex(prev => Math.min(questions.length - 1, prev + 1))}
-              className="flex items-center gap-2 px-4 py-2 text-indigo-600 hover:text-indigo-700 font-medium"
+              className="flex items-center gap-2 px-4 py-2 text-indigo-600 hover:text-indigo-700 font-medium cursor-pointer"
             >
               {lang === 'ru' ? 'Далее' : 'Next'}
               <ChevronRight className="w-5 h-5" />
@@ -348,7 +348,7 @@ export function Test() {
             <button
               key={q.id}
               onClick={() => setCurrentIndex(idx)}
-              className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${idx === currentIndex
+              className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors cursor-pointer ${idx === currentIndex
                 ? 'bg-indigo-600 text-white'
                 : answers[q.id]
                   ? 'bg-indigo-100 text-indigo-700'

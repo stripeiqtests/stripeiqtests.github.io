@@ -50,6 +50,7 @@ export function Results() {
   const [processingPayment, setProcessingPayment] = useState(false);
   const [content, setContent] = useState<Record<string, string>>({});
   const [archetypeResult, setArchetypeResult] = useState<ArchetypeResult | null>(null);
+  const [followUpTestSlug, setFollowUpTestSlug] = useState<string | null>(null);
 
   useEffect(() => {
     loadContent();
@@ -72,6 +73,17 @@ export function Results() {
         contentMap[item.key] = item.value;
       });
       setContent(contentMap);
+    }
+
+    // Load follow-up test slug from app_settings
+    const { data: settingsData } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'follow_up_test_slug')
+      .single();
+
+    if (settingsData) {
+      setFollowUpTestSlug(settingsData.value);
     }
   }
 
@@ -473,6 +485,7 @@ export function Results() {
           <ArchetypeResultSection
             archetype={archetypeResult}
             lang={lang}
+            followUpTestSlug={followUpTestSlug}
           />
         )}
 
@@ -616,10 +629,12 @@ function getProfileDescription(session: TestSession, lang: string): string {
 // Archetype Result Section Component
 function ArchetypeResultSection({
   archetype,
-  lang
+  lang,
+  followUpTestSlug
 }: {
   archetype: ArchetypeResult;
   lang: string;
+  followUpTestSlug: string | null;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -632,6 +647,11 @@ function ArchetypeResultSection({
     return lines.map((line, index) => {
       // Bold text with **
       const processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+      // Horizontal rule
+      if (line.trim() === '---') {
+        return <hr key={index} className="my-4 border-gray-300" />;
+      }
 
       // Bullet points
       if (line.trim().startsWith('•')) {
@@ -669,11 +689,33 @@ function ArchetypeResultSection({
 
   const colorClass = colors[archetype.dimension] || colors.analyst;
 
+  // CTA section texts
+  const ctaButtonText = lang === 'ru' ? '👉 Узнать свои архетипы' : '👉 Discover Your Archetypes';
+  const ctaSubtitle = lang === 'ru'
+    ? 'Если вы хотите точно узнать:'
+    : 'If you want to know exactly:';
+  const ctaBullets = lang === 'ru'
+    ? [
+      'какой архетип у вас <strong>основной</strong>',
+      'какие архетипы вас <strong>поддерживают</strong>',
+      'какой архетип находится <strong>в тени</strong> и может создавать повторяющиеся сценарии',
+      'как именно они проявляются <strong>в жизни, решениях и отношениях</strong>',
+    ]
+    : [
+      'which archetype is your <strong>main one</strong>',
+      'which archetypes <strong>support</strong> you',
+      'which archetype is <strong>in the shadow</strong> and may create repeating patterns',
+      'how exactly they manifest <strong>in life, decisions and relationships</strong>',
+    ];
+  const ctaFooter = lang === 'ru'
+    ? 'вы можете пройти <strong>второй тест</strong>.'
+    : 'you can take the <strong>second test</strong>.';
+
   return (
     <div className={`rounded-2xl border-2 ${colorClass.border} ${colorClass.bg} mb-6 overflow-hidden`}>
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-6 py-4 flex items-center justify-between text-left"
+        className="w-full px-6 py-4 flex items-center justify-between text-left cursor-pointer"
       >
         <h3 className={`text-lg font-bold ${colorClass.title}`}>{title}</h3>
         <ChevronDown className={`w-5 h-5 ${colorClass.title} transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -682,6 +724,30 @@ function ArchetypeResultSection({
       {isExpanded && (
         <div className="px-6 pb-6 space-y-2 text-sm leading-relaxed">
           {renderContent(content)}
+
+          {/* CTA Section */}
+          {followUpTestSlug && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              {/* CTA Button */}
+              <Link
+                to={`/${followUpTestSlug}`}
+                className="block w-full text-center bg-indigo-600 text-white py-4 rounded-xl font-medium hover:bg-indigo-700 transition-colors cursor-pointer mb-4"
+              >
+                {ctaButtonText}
+              </Link>
+
+              {/* Text under button */}
+              <div className="text-sm text-gray-600">
+                <p className="mb-2">{ctaSubtitle}</p>
+                <ul className="list-disc list-inside space-y-1 mb-2">
+                  {ctaBullets.map((bullet, idx) => (
+                    <li key={idx} dangerouslySetInnerHTML={{ __html: bullet }} />
+                  ))}
+                </ul>
+                <p dangerouslySetInnerHTML={{ __html: ctaFooter }} />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
