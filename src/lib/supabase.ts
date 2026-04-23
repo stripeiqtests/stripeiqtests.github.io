@@ -1,9 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const defaultSupabaseUrl = 'https://afsoyuczexiztsjntkvi.supabase.co';
+const defaultSupabasePublishableKey =
+  'sb_publishable_ARjsX-L4PvbkuPSEttyQnQ_Wtq-Aibs';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || defaultSupabaseUrl;
+const supabaseKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  defaultSupabasePublishableKey;
+
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Types for our database
 export interface Test {

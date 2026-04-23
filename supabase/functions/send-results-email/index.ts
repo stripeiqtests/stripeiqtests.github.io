@@ -41,7 +41,7 @@ serve(async (req) => {
     console.log('Processing email for session:', sessionId);
 
     // Get secrets
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://movuagoqspojzshirvuz.supabase.co';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://afsoyuczexiztsjntkvi.supabase.co';
     const serviceKey = Deno.env.get('SERVICE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
