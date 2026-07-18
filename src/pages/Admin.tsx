@@ -428,18 +428,21 @@ export function Admin() {
                           <button
                             onClick={() => setEditingTest(test)}
                             className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title={t('admin.edit')}
                           >
                             <Edit2 className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => deleteTest(test.id)}
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title={t('admin.delete')}
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => handleExpandTest(test.id)}
                             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                            title={t('admin.questions')}
                           >
                             {expandedTest === test.id ? (
                               <ChevronUp className="w-5 h-5" />
@@ -508,12 +511,14 @@ export function Admin() {
                                   <button
                                     onClick={() => setEditingQuestion(question)}
                                     className="p-1.5 text-gray-400 hover:text-indigo-600 rounded"
+                                    title={t('admin.edit')}
                                   >
                                     <Edit2 className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => deleteQuestion(question.id, test.id)}
                                     className="p-1.5 text-gray-400 hover:text-red-600 rounded"
+                                    title={t('admin.delete')}
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
