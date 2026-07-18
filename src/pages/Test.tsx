@@ -5,6 +5,7 @@ import type { Test as TestType, Question } from '../lib/supabase';
 import { Brain, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
 import { trackTestStart, trackTestComplete } from '../lib/analytics';
+import { getQuestionImageUrls } from '../lib/questionImages';
 
 export function Test() {
   const { slug } = useParams<{ slug: string }>();
@@ -226,12 +227,37 @@ export function Test() {
     );
   }
 
+  if (!test || questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+        <div className="max-w-md rounded-2xl border border-amber-200 bg-white p-8 text-center shadow-sm">
+          <Brain className="mx-auto mb-4 h-12 w-12 text-amber-500" />
+          <h1 className="text-xl font-bold text-gray-900">
+            {lang === 'ru' ? 'Вопросы пока недоступны' : 'Questions are not available yet'}
+          </h1>
+          <p className="mt-2 text-gray-500">
+            {lang === 'ru'
+              ? 'Этот тест ещё не заполнен. Вернитесь на главную и выберите другой тест.'
+              : 'This test has not been populated yet. Return home and choose another test.'}
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="mt-6 rounded-lg bg-indigo-600 px-5 py-3 font-medium text-white hover:bg-indigo-700"
+          >
+            {lang === 'ru' ? 'На главную' : 'Back home'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const currentQuestion = questions[currentIndex];
   const options = (typeof currentQuestion.options === 'string'
     ? JSON.parse(currentQuestion.options)
     : currentQuestion.options) as { label: string; value: string }[];
   const selectedAnswer = answers[currentQuestion.id];
   const progress = ((currentIndex + 1) / questions.length) * 100;
+  const questionImageUrls = getQuestionImageUrls(currentQuestion);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
@@ -259,24 +285,30 @@ export function Test() {
       {/* Question */}
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          {/* Question Number & Dimension */}
-          <div className="flex items-center gap-3 mb-6">
+          {/* Question Number */}
+          <div className="mb-6">
             <span className="text-lg font-bold text-indigo-600">
               {t('test.question')} {currentQuestion.question_number}
-            </span>
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${currentQuestion.dimension === 'analyst' ? 'bg-blue-100 text-blue-700' :
-              currentQuestion.dimension === 'strategist' ? 'bg-purple-100 text-purple-700' :
-                currentQuestion.dimension === 'observer' ? 'bg-green-100 text-green-700' :
-                  'bg-yellow-100 text-yellow-700'
-              }`}>
-              {currentQuestion.dimension}
             </span>
           </div>
 
           {/* Question Text */}
-          <h2 className="text-xl text-gray-900 mb-6">
-            {currentQuestion.question_text}
+          <h2 className="text-xl text-gray-900 mb-6 whitespace-pre-line">
+            {currentQuestion.question_text.replace(/\\n/g, '\n')}
           </h2>
+
+          {questionImageUrls.length > 0 && (
+            <div className="mb-6 space-y-4">
+              {questionImageUrls.map((imageUrl, index) => (
+                <img
+                  key={imageUrl}
+                  src={imageUrl}
+                  alt={`${lang === 'ru' ? 'Иллюстрация к вопросу' : 'Question illustration'} ${currentQuestion.question_number}${questionImageUrls.length > 1 ? ` (${index + 1}/${questionImageUrls.length})` : ''}`}
+                  className="mx-auto max-h-[32rem] max-w-full rounded-lg border border-gray-200 bg-white object-contain"
+                />
+              ))}
+            </div>
+          )}
 
           {/* Options */}
           <div className="space-y-3">
@@ -302,16 +334,6 @@ export function Test() {
             ))}
           </div>
 
-          {/* Question Image - displayed after options */}
-          {currentQuestion.image_url && (
-            <div className="mt-6">
-              <img
-                src={currentQuestion.image_url}
-                alt="Question"
-                className="max-w-full h-auto rounded-lg border border-gray-200"
-              />
-            </div>
-          )}
         </div>
 
         {/* Navigation */}
