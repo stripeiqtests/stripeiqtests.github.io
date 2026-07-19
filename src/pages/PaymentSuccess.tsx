@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CheckCircle } from 'lucide-react';
@@ -7,6 +7,7 @@ import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
 import { trackPurchase } from '../lib/analytics';
 import { useContent } from '../lib/useContent';
+import { resultPath, storeSessionAccess } from '../lib/sessionAccess';
 
 export function PaymentSuccess() {
   const [searchParams] = useSearchParams();
@@ -16,6 +17,42 @@ export function PaymentSuccess() {
   const { lang } = useLanguage();
   const { isAdmin } = useAdmin();
   const { getContent, saveContent } = useContent();
+
+  const handlePaymentSuccess = useCallback(async (stripeSessionId: string) => {
+    try {
+      // Call edge function to verify payment and update session
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { stripeSessionId },
+      });
+
+      console.log('Verify payment response:', { data, error });
+
+      if (error) throw error;
+
+      // Check if data contains an error message
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      // Redirect to results page
+      if (data?.testSessionId && data?.resultAccessToken) {
+        storeSessionAccess(data.testSessionId, data.resultAccessToken);
+        // Track successful purchase
+        trackPurchase(data.testId || '', data.amountPaid || 500);
+
+        // Small delay to ensure analytics event is sent before navigation
+        setTimeout(() => {
+          navigate(resultPath(data.testSessionId, data.resultAccessToken));
+        }, 100);
+      } else {
+        throw new Error('No test session ID returned');
+      }
+    } catch (err: unknown) {
+      console.error('Payment verification error:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Unknown error occurred');
+      setProcessing(false);
+    }
+  }, [navigate]);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
@@ -34,46 +71,11 @@ export function PaymentSuccess() {
     }
 
     if (sessionId) {
-      handlePaymentSuccess(sessionId);
+      void handlePaymentSuccess(sessionId);
     } else {
       navigate('/');
     }
-  }, [searchParams, navigate, isAdmin]);
-
-  async function handlePaymentSuccess(stripeSessionId: string) {
-    try {
-      // Call edge function to verify payment and update session
-      const { data, error } = await supabase.functions.invoke('verify-payment', {
-        body: { stripeSessionId },
-      });
-
-      console.log('Verify payment response:', { data, error });
-
-      if (error) throw error;
-
-      // Check if data contains an error message
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
-      // Redirect to results page
-      if (data?.testSessionId) {
-        // Track successful purchase
-        trackPurchase(data.testId || '', data.testSessionId, data.amountPaid || 500);
-
-        // Small delay to ensure analytics event is sent before navigation
-        setTimeout(() => {
-          navigate(`/results/${data.testSessionId}`);
-        }, 100);
-      } else {
-        throw new Error('No test session ID returned');
-      }
-    } catch (err: any) {
-      console.error('Payment verification error:', err);
-      setErrorMessage(err?.message || 'Unknown error occurred');
-      setProcessing(false);
-    }
-  }
+  }, [handlePaymentSuccess, searchParams, navigate, isAdmin]);
 
   const defaultTitle = lang === 'ru' ? 'Оплата прошла успешно!' : 'Payment Successful!';
   const defaultProcessing = lang === 'ru' ? 'Обрабатываем ваши результаты...' : 'Processing your results...';

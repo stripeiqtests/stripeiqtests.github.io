@@ -61,9 +61,11 @@ serve(async (req) => {
       throw new Error('Required server configuration is missing');
     }
 
-    const { sessionId } = await req.json();
-    if (typeof sessionId !== 'string' || !/^[0-9a-f-]{36}$/i.test(sessionId)) {
-      return json({ error: 'Invalid or missing sessionId' }, 400, origin);
+    const { sessionId, accessToken } = await req.json();
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (typeof sessionId !== 'string' || typeof accessToken !== 'string' ||
+        !uuidPattern.test(sessionId) || !uuidPattern.test(accessToken)) {
+      return json({ error: 'Invalid session capability' }, 400, origin);
     }
 
     const apiHeaders = {
@@ -72,12 +74,13 @@ serve(async (req) => {
     };
 
     const sessionResponse = await fetch(
-      `${supabaseUrl}/rest/v1/test_sessions?id=eq.${encodeURIComponent(sessionId)}&select=id,test_id,email,is_paid`,
+      `${supabaseUrl}/rest/v1/test_sessions?id=eq.${encodeURIComponent(sessionId)}&select=id,test_id,email,is_paid,access_token`,
       { headers: apiHeaders },
     );
     if (!sessionResponse.ok) throw new Error('Unable to load test session');
     const session = (await sessionResponse.json())[0];
     if (!session) return json({ error: 'Test session not found' }, 404, origin);
+    if (session.access_token !== accessToken) return json({ error: 'Test session not found' }, 404, origin);
     if (session.is_paid) return json({ error: 'Test session is already paid' }, 409, origin);
 
     const testResponse = await fetch(

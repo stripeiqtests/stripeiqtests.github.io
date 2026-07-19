@@ -83,7 +83,7 @@ serve(async (req) => {
 
     const [sessionResponse, testResponse] = await Promise.all([
       fetch(
-        `${supabaseUrl}/rest/v1/test_sessions?id=eq.${encodeURIComponent(testSessionId)}&select=id,test_id,email,is_paid,stripe_session_id`,
+        `${supabaseUrl}/rest/v1/test_sessions?id=eq.${encodeURIComponent(testSessionId)}&select=id,test_id,email,is_paid,stripe_session_id,access_token`,
         { headers: apiHeaders },
       ),
       fetch(
@@ -108,6 +108,7 @@ serve(async (req) => {
         testId,
         amountPaid: checkoutSession.amount_total,
         alreadyProcessed: true,
+        resultAccessToken: session.access_token,
       }, 200, origin);
     }
 
@@ -147,6 +148,7 @@ serve(async (req) => {
       testSessionId,
       testId,
       amountPaid: checkoutSession.amount_total,
+      resultAccessToken: updatedSession.access_token,
     }, 200, origin);
   } catch (error) {
     console.error('Payment verification error:', error);

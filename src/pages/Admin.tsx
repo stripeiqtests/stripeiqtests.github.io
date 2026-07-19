@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { generateSlug } from '../lib/utils';
 import type { Test, Question } from '../lib/supabase';
@@ -15,8 +15,9 @@ import { AdminSettingsTab } from '../components/AdminSettingsTab';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 
 export function Admin() {
-  const { isAdmin, setIsAdmin, logout } = useAdmin();
+  const { isAdmin, authLoading, login, logout } = useAdmin();
   const { t } = useLanguage();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -43,42 +44,7 @@ export function Admin() {
   };
   const activeTab = getActiveTab();
 
-  useEffect(() => {
-    // Load tests if already authenticated
-    if (isAdmin) {
-      loadTests();
-    }
-  }, [isAdmin]);
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    // Get admin password from Supabase
-    const { data, error } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'admin_password')
-      .single();
-
-    if (error) {
-      setError('Failed to verify password. Please try again.');
-      setLoading(false);
-      return;
-    }
-
-    if (data.value === password) {
-      setIsAdmin(true);
-      localStorage.setItem('admin_auth', 'true');
-      loadTests();
-    } else {
-      setError('Invalid password');
-    }
-    setLoading(false);
-  }
-
-  async function loadTests() {
+  const loadTests = useCallback(async () => {
     const { data, error } = await supabase
       .from('tests')
       .select('*')
@@ -87,6 +53,28 @@ export function Admin() {
     if (!error && data) {
       setTests(data);
     }
+  }, []);
+
+  useEffect(() => {
+    if (isAdmin) {
+      // Data is loaded asynchronously; the state update occurs after the request.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void loadTests();
+    }
+  }, [isAdmin, loadTests]);
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    const loginError = await login(email.trim(), password);
+    if (!loginError) {
+      loadTests();
+    } else {
+      setError(loginError);
+    }
+    setLoading(false);
   }
 
   async function loadQuestions(testId: string) {
@@ -224,6 +212,14 @@ export function Admin() {
     }
   }
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
+      </div>
+    );
+  }
+
   // Login form
   if (!isAdmin) {
     return (
@@ -234,17 +230,26 @@ export function Admin() {
               <Lock className="w-8 h-8 text-indigo-600" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Admin Access</h1>
-            <p className="text-gray-500 mt-2">Enter password to continue</p>
+            <p className="text-gray-500 mt-2">Sign in with an administrator account</p>
           </div>
 
           <form onSubmit={handleLogin}>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@example.com"
+              autoComplete="username"
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-4"
+              autoFocus
+            />
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
+              autoComplete="current-password"
               className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent mb-4"
-              autoFocus
             />
 
             {error && (
@@ -253,7 +258,7 @@ export function Admin() {
 
             <button
               type="submit"
-              disabled={loading || !password}
+              disabled={loading || !email.trim() || !password}
               className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Verifying...' : 'Login'}

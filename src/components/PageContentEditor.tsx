@@ -165,6 +165,8 @@ export function PageContentEditor({ pageType }: { pageType?: 'success' | 'cancel
     );
 
     useEffect(() => {
+        // The request resolves before it updates local UI state.
+        // eslint-disable-next-line react-hooks/immutability
         loadContent();
     }, []);
 

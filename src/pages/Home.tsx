@@ -16,6 +16,8 @@ export function Home() {
   const { getContent, saveContent } = useContent();
 
   useEffect(() => {
+    // The request resolves before it updates local UI state.
+    // eslint-disable-next-line react-hooks/immutability
     loadTests();
   }, []);
 

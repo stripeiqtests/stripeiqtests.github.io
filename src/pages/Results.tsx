@@ -8,6 +8,8 @@ import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
 import { trackBeginCheckout } from '../lib/analytics';
 import { useContent } from '../lib/useContent';
+import { RichInlineText, RichTextContent } from '../components/RichTextContent';
+import { readSessionAccess } from '../lib/sessionAccess';
 
 export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -76,6 +78,7 @@ export function Results() {
   const [processingPayment, setProcessingPayment] = useState(false);
   const [archetypeResult, setArchetypeResult] = useState<ArchetypeResult | null>(null);
   const [followUpTestSlug, setFollowUpTestSlug] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   useEffect(() => {
     loadFollowUpTestSlug();
@@ -85,7 +88,7 @@ export function Results() {
     if (sessionId && !isPreview) {
       loadSession();
     }
-  }, [sessionId, isPreview]);
+  }, [sessionId, isPreview]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadFollowUpTestSlug() {
     const { data: settingsData } = await supabase
@@ -122,11 +125,22 @@ export function Results() {
 
 
   async function loadSession() {
-    const { data: sessionData, error: sessionError } = await supabase
-      .from('test_sessions')
-      .select('*')
-      .eq('id', sessionId)
+    if (!sessionId) return;
+    const token = readSessionAccess(sessionId);
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    setAccessToken(token);
+    const { data: rawSessionData, error: sessionError } = await supabase
+      .rpc('get_test_session', {
+        p_session_id: sessionId,
+        p_access_token: token,
+      })
       .single();
+
+    const sessionData = rawSessionData as TestSession | null;
 
     if (sessionError || !sessionData) {
       setLoading(false);
@@ -153,7 +167,7 @@ export function Results() {
   }
 
   async function handlePayment() {
-    if (!session || !test) return;
+    if (!session || !test || !accessToken) return;
 
     setProcessingPayment(true);
 
@@ -165,9 +179,7 @@ export function Results() {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           sessionId: session.id,
-          testId: test.id,
-          priceInCents: test.price_cents,
-          email: session.email,
+          accessToken,
         },
       });
 
@@ -740,45 +752,6 @@ function ArchetypeResultSection({
   const title = lang === 'ru' ? archetype.title_ru : archetype.title_en;
   const content = lang === 'ru' ? archetype.content_ru : archetype.content_en;
 
-  // Simple markdown-like renderer for content
-  const renderContent = (text: string) => {
-    const lines = text.split('\n');
-    return lines.map((line, index) => {
-      // Bold text with **
-      const processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-
-      // Horizontal rule
-      if (line.trim() === '---') {
-        return <hr key={index} className="my-4 border-gray-300" />;
-      }
-
-      // Bullet points
-      if (line.trim().startsWith('•')) {
-        return (
-          <li
-            key={index}
-            className="ml-4 text-gray-700"
-            dangerouslySetInnerHTML={{ __html: processedLine.replace('•', '').trim() }}
-          />
-        );
-      }
-
-      // Empty lines
-      if (line.trim() === '') {
-        return <br key={index} />;
-      }
-
-      // Regular paragraph
-      return (
-        <p
-          key={index}
-          className="text-gray-700"
-          dangerouslySetInnerHTML={{ __html: processedLine }}
-        />
-      );
-    });
-  };
-
   const colors: Record<string, { bg: string; border: string; title: string }> = {
     analyst: { bg: 'bg-blue-50', border: 'border-blue-200', title: 'text-blue-700' },
     strategist: { bg: 'bg-purple-50', border: 'border-purple-200', title: 'text-purple-700' },
@@ -795,20 +768,20 @@ function ArchetypeResultSection({
     : 'If you want to know exactly:';
   const ctaBullets = lang === 'ru'
     ? [
-      'какой архетип у вас <strong>основной</strong>',
-      'какие архетипы вас <strong>поддерживают</strong>',
-      'какой архетип находится <strong>в тени</strong> и может создавать повторяющиеся сценарии',
-      'как именно они проявляются <strong>в жизни, решениях и отношениях</strong>',
+      'какой архетип у вас **основной**',
+      'какие архетипы вас **поддерживают**',
+      'какой архетип находится **в тени** и может создавать повторяющиеся сценарии',
+      'как именно они проявляются **в жизни, решениях и отношениях**',
     ]
     : [
-      'which archetype is your <strong>main one</strong>',
-      'which archetypes <strong>support</strong> you',
-      'which archetype is <strong>in the shadow</strong> and may create repeating patterns',
-      'how exactly they manifest <strong>in life, decisions and relationships</strong>',
+      'which archetype is your **main one**',
+      'which archetypes **support** you',
+      'which archetype is **in the shadow** and may create repeating patterns',
+      'how exactly they manifest **in life, decisions and relationships**',
     ];
   const ctaFooter = lang === 'ru'
-    ? 'вы можете пройти <strong>второй тест</strong>.'
-    : 'you can take the <strong>second test</strong>.';
+    ? 'вы можете пройти **второй тест**.'
+    : 'you can take the **second test**.';
 
   return (
     <div className={`rounded-2xl border-2 ${colorClass.border} ${colorClass.bg} mb-6 overflow-hidden`}>
@@ -822,7 +795,7 @@ function ArchetypeResultSection({
 
       {isExpanded && (
         <div className="px-6 pb-6 space-y-2 text-sm leading-relaxed">
-          {renderContent(content)}
+          <RichTextContent value={content} className="space-y-2" />
 
           {/* CTA Section */}
           {followUpTestSlug && (
@@ -840,10 +813,10 @@ function ArchetypeResultSection({
                 <p className="mb-2">{ctaSubtitle}</p>
                 <ul className="list-disc list-inside space-y-1 mb-2">
                   {ctaBullets.map((bullet, idx) => (
-                    <li key={idx} dangerouslySetInnerHTML={{ __html: bullet }} />
+                    <li key={idx}><RichInlineText>{bullet}</RichInlineText></li>
                   ))}
                 </ul>
-                <p dangerouslySetInnerHTML={{ __html: ctaFooter }} />
+                <p><RichInlineText>{ctaFooter}</RichInlineText></p>
               </div>
             </div>
           )}

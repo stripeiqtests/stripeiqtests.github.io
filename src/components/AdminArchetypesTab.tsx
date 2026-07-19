@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { ArchetypeResult } from '../lib/supabase';
 import { Save, Brain, Target, Eye, Sparkles, AlertCircle, CheckCircle, ChevronDown } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
+import { RichTextContent } from './RichTextContent';
 
 const DIMENSION_INFO = {
     analyst: {
@@ -133,50 +134,17 @@ export function AdminArchetypesTab() {
                 setEditingDimension(null);
                 setSaveStatus(null);
             }, 1500);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Error saving archetype:', err);
+            const message = err instanceof Error ? err.message : String(err);
             setSaveStatus({
                 type: 'error',
-                message: lang === 'ru' ? `Ошибка: ${err.message}` : `Error: ${err.message}`
+                message: lang === 'ru' ? `Ошибка: ${message}` : `Error: ${message}`
             });
         }
 
         setSaving(null);
     }
-
-    // Markdown-like renderer for preview
-    const renderPreviewContent = (text: string) => {
-        const lines = text.split('\n');
-        return lines.map((line, index) => {
-            const processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-
-            if (line.trim() === '---') {
-                return <hr key={index} className="my-4 border-gray-300" />;
-            }
-
-            if (line.trim().startsWith('•')) {
-                return (
-                    <li
-                        key={index}
-                        className="ml-4 text-gray-700"
-                        dangerouslySetInnerHTML={{ __html: processedLine.replace('•', '').trim() }}
-                    />
-                );
-            }
-
-            if (line.trim() === '') {
-                return <br key={index} />;
-            }
-
-            return (
-                <p
-                    key={index}
-                    className="text-gray-700"
-                    dangerouslySetInnerHTML={{ __html: processedLine }}
-                />
-            );
-        });
-    };
 
     if (loading) {
         return (
@@ -364,7 +332,10 @@ export function AdminArchetypesTab() {
                                                 <ChevronDown className={`w-5 h-5 ${info.color} rotate-180`} />
                                             </div>
                                             <div className="px-4 pb-4 bg-white/50 space-y-2 text-sm leading-relaxed">
-                                                {renderPreviewContent(editLang === 'ru' ? (editForm.content_ru || '') : (editForm.content_en || ''))}
+                                                <RichTextContent
+                                                    value={editLang === 'ru' ? (editForm.content_ru || '') : (editForm.content_en || '')}
+                                                    className="space-y-2"
+                                                />
                                             </div>
                                         </div>
                                     </div>

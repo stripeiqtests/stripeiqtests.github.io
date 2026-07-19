@@ -35,6 +35,8 @@ export interface Question {
   created_at: string;
 }
 
+export type PublicQuestion = Omit<Question, 'correct_answer'>;
+
 export interface TestSession {
   id: string;
   test_id: string;

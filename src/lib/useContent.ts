@@ -26,6 +26,8 @@ export function useContent() {
     }, []);
 
     useEffect(() => {
+        // The request resolves before it updates local UI state.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         loadContent();
     }, [loadContent]);
 

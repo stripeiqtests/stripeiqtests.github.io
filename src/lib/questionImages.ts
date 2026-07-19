@@ -1,5 +1,7 @@
 import type { Question } from './supabase';
 
+type QuestionImageReference = Pick<Question, 'image_url' | 'question_number'>;
+
 const legacyImageSets: Record<number, string[]> = {
   11: ['/question_images/q11_1.gif', '/question_images/q11_2.gif'],
   12: ['/question_images/q12_1.gif', '/question_images/q12_2.gif'],
@@ -18,7 +20,7 @@ const legacyImageSets: Record<number, string[]> = {
   21: ['/question_images/q21_1.gif', '/question_images/q21_2.gif'],
 };
 
-export function getQuestionImageUrls(question: Question): string[] {
+export function getQuestionImageUrls(question: QuestionImageReference): string[] {
   if (!question.image_url) return [];
 
   const legacyQuestionNumber = Number(

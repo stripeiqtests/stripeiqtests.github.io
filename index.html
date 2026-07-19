@@ -30,7 +30,7 @@
     window.dataLayer = window.dataLayer || [];
     function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
-    gtag('config', 'G-BNN1N9N1PT');
+    gtag('config', 'G-BNN1N9N1PT', { send_page_view: false });
   </script>
   <!-- Meta Pixel Code -->
   <script>
@@ -46,10 +46,9 @@
     }(window, document, 'script',
       'https://connect.facebook.net/en_US/fbevents.js');
     fbq('init', 'XXXXXXXXXXXXXXXXX');
-    fbq('track', 'PageView');
+    // Route-level page views are intentionally disabled so result/payment URLs
+    // are never sent to third-party analytics as an automatic side effect.
   </script>
-  <noscript><img height="1" width="1" style="display:none"
-      src="https://www.facebook.com/tr?id=XXXXXXXXXXXXXXXXX&ev=PageView&noscript=1" /></noscript>
   <!-- End Meta Pixel Code -->
 </head>
 

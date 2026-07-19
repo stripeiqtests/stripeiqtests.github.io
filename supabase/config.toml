@@ -1,0 +1,13 @@
+project_id = "iq_test_static"
+
+# Checkout and payment verification are intentionally public endpoints with
+# their own per-session capability/payment checks. Email additionally requires
+# the service-role authorization supplied by verify-payment.
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.verify-payment]
+verify_jwt = false
+
+[functions.send-results-email]
+verify_jwt = false

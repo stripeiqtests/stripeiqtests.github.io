@@ -5,9 +5,9 @@
 // Type declarations for global analytics functions
 declare global {
     interface Window {
-        gtag: (...args: any[]) => void;
-        fbq: (...args: any[]) => void;
-        dataLayer: any[];
+        gtag: (...args: unknown[]) => void;
+        fbq: (...args: unknown[]) => void;
+        dataLayer: unknown[];
     }
 }
 
@@ -20,7 +20,7 @@ export const META_PIXEL_ID = 'XXXXXXXXXXXXXXXXX';
  */
 export function trackEvent(
     eventName: string,
-    params?: Record<string, any>,
+    params?: Record<string, unknown>,
     options?: {
         gaOnly?: boolean;
         metaOnly?: boolean;
@@ -102,12 +102,11 @@ export function trackBeginCheckout(testId: string, priceInCents: number, currenc
  */
 export function trackPurchase(
     testId: string,
-    sessionId: string,
     priceInCents: number,
     currency: string = 'USD'
 ) {
     trackEvent('purchase', {
-        transaction_id: sessionId,
+        transaction_id: crypto.randomUUID(),
         test_id: testId,
         value: priceInCents / 100,
         currency,

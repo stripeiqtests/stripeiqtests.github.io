@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import type { Test as TestType, Question } from '../lib/supabase';
+import type { Test as TestType, PublicQuestion } from '../lib/supabase';
 import { Brain, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
 import { trackTestStart, trackTestComplete } from '../lib/analytics';
 import { getQuestionImageUrls } from '../lib/questionImages';
+import { resultPath, storeSessionAccess } from '../lib/sessionAccess';
 
 export function Test() {
   const { slug } = useParams<{ slug: string }>();
@@ -13,7 +14,7 @@ export function Test() {
   const { t, lang } = useLanguage();
 
   const [test, setTest] = useState<TestType | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<PublicQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [email, setEmail] = useState('');
@@ -22,13 +23,7 @@ export function Test() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (slug) {
-      loadTest();
-    }
-  }, [slug]);
-
-  async function loadTest() {
+  const loadTest = useCallback(async () => {
     // Load test by slug
     const { data: testData, error: testError } = await supabase
       .from('tests')
@@ -46,19 +41,24 @@ export function Test() {
 
     // Load questions using the test's id
     const { data: questionsData, error: questionsError } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('test_id', testData.id)
-      .order('question_number', { ascending: true });
+      .rpc('get_public_questions', { p_test_id: testData.id });
 
     if (!questionsError && questionsData) {
-      setQuestions(questionsData);
+      setQuestions(questionsData as PublicQuestion[]);
       // Track test start event
       trackTestStart(testData.id, testData.title);
     }
 
     setLoading(false);
-  }
+  }, [navigate, slug]);
+
+  useEffect(() => {
+    if (slug) {
+      // Data is loaded asynchronously; the state update occurs after the request.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void loadTest();
+    }
+  }, [loadTest, slug]);
 
   function handleAnswer(answer: string) {
     const questionId = questions[currentIndex].id;
@@ -77,16 +77,16 @@ export function Test() {
 
     setSubmitting(true);
 
-    // Create test session
-    const { data: session, error: sessionError } = await supabase
-      .from('test_sessions')
-      .insert({
-        test_id: test.id,
-        email: email || null,
-        answers: JSON.stringify(answers),
+    // Score and create the protected session at the database boundary.
+    const { data: rawSession, error: sessionError } = await supabase
+      .rpc('submit_test_session', {
+        p_test_id: test.id,
+        p_email: email || null,
+        p_answers: answers,
       })
-      .select()
       .single();
+
+    const session = rawSession as { session_id: string; access_token: string } | null;
 
     if (sessionError || !session) {
       setSubmitError(t('common.submit_error'));
@@ -94,52 +94,9 @@ export function Test() {
       return;
     }
 
-    // Calculate scores
-    const dimensionScores = {
-      analyst: { correct: 0, total: 0 },
-      strategist: { correct: 0, total: 0 },
-      observer: { correct: 0, total: 0 },
-      intuitive: { correct: 0, total: 0 },
-    };
-
-    questions.forEach(question => {
-      const dimension = question.dimension;
-      dimensionScores[dimension].total++;
-
-      const userAnswer = answers[question.id];
-      if (userAnswer === question.correct_answer) {
-        dimensionScores[dimension].correct++;
-      }
-    });
-
-    // Calculate percentage scores
-    const analystScore = dimensionScores.analyst.total > 0
-      ? (dimensionScores.analyst.correct / dimensionScores.analyst.total) * 100
-      : 0;
-    const strategistScore = dimensionScores.strategist.total > 0
-      ? (dimensionScores.strategist.correct / dimensionScores.strategist.total) * 100
-      : 0;
-    const observerScore = dimensionScores.observer.total > 0
-      ? (dimensionScores.observer.correct / dimensionScores.observer.total) * 100
-      : 0;
-    const intuitiveScore = dimensionScores.intuitive.total > 0
-      ? (dimensionScores.intuitive.correct / dimensionScores.intuitive.total) * 100
-      : 0;
-
-    const overallScore = (analystScore + strategistScore + observerScore + intuitiveScore) / 4;
-
-    // Update session with scores
-    await supabase
-      .from('test_sessions')
-      .update({
-        analyst_score: analystScore,
-        strategist_score: strategistScore,
-        observer_score: observerScore,
-        intuitive_score: intuitiveScore,
-        overall_score: overallScore,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', session.id);
+    const sessionId = session.session_id;
+    const accessToken = session.access_token;
+    storeSessionAccess(sessionId, accessToken);
 
     // Track test complete event
     trackTestComplete(test.id, test.title, questions.length);
@@ -147,7 +104,7 @@ export function Test() {
     // Small delay to ensure analytics event is sent before navigation
     setTimeout(() => {
       // Navigate to results page
-      navigate(`/results/${session.id}`);
+      navigate(resultPath(sessionId, accessToken));
     }, 100);
   }
 

@@ -1,11 +1,33 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import sanitizeHtml from 'https://esm.sh/sanitize-html@2.17.0?target=deno';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Simple markdown to HTML converter for archetype content  
+const richTextCompatibilityMode = Deno.env.get('RICH_TEXT_COMPATIBILITY_MODE') === 'true';
+
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function safeInlineMarkup(text: string): string {
+  const source = richTextCompatibilityMode
+    ? sanitizeHtml(text, {
+      allowedTags: ['strong', 'b', 'em', 'i', 'br'],
+      allowedAttributes: {},
+    })
+    : escapeHtml(text);
+  return source.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+// Simple, escaped markdown to HTML converter for archetype content.
 function markdownToHtml(text: string): string {
   if (!text) return '';
 
@@ -13,7 +35,7 @@ function markdownToHtml(text: string): string {
     .split('\n')
     .map(line => {
       // Bold text with **
-      let processed = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      const processed = safeInlineMarkup(line);
 
       // Bullet points
       if (line.trim().startsWith('•')) {
@@ -38,7 +60,7 @@ serve(async (req) => {
 
   try {
     const { sessionId } = await req.json();
-    console.log('Processing email for session:', sessionId);
+    console.log('Processing results email request');
 
     // Get secrets
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://afsoyuczexiztsjntkvi.supabase.co';
@@ -53,6 +75,13 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'SERVICE_KEY not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (req.headers.get('authorization') !== `Bearer ${serviceKey}`) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -94,7 +123,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('Session found, email:', session.email);
+    console.log('Session found');
 
     if (!session.email) {
       return new Response(
@@ -132,7 +161,7 @@ serve(async (req) => {
         if (archetype) {
           // Choose language based on email domain or default to Russian
           const isRussian = true; // Default to Russian for now
-          const title = isRussian ? archetype.title_ru : archetype.title_en;
+          const title = escapeHtml(isRussian ? archetype.title_ru : archetype.title_en);
           const content = isRussian ? archetype.content_ru : archetype.content_en;
 
           const dimensionColors: Record<string, { bg: string; border: string; text: string }> = {
@@ -275,7 +304,7 @@ serve(async (req) => {
     `;
 
     // Send email via Resend
-    console.log('Sending email to:', session.email);
+    console.log('Sending results email');
     const emailResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {

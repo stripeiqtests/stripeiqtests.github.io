@@ -20,6 +20,8 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
     const [languageModeSaved, setLanguageModeSaved] = useState(false);
 
     useEffect(() => {
+        // The request resolves before it updates local UI state.
+        // eslint-disable-next-line react-hooks/immutability
         loadSettings();
     }, []);
 
