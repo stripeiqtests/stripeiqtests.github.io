@@ -21,6 +21,12 @@ export function Admin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordUpdateError, setPasswordUpdateError] = useState('');
+  const [passwordUpdateMessage, setPasswordUpdateMessage] = useState('');
+  const [passwordUpdating, setPasswordUpdating] = useState(false);
 
   // Test management state
   const [tests, setTests] = useState<Test[]>([]);
@@ -75,6 +81,35 @@ export function Admin() {
       setError(loginError);
     }
     setLoading(false);
+  }
+
+  async function handlePasswordUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordUpdateError('');
+    setPasswordUpdateMessage('');
+
+    if (newPassword.length < 12) {
+      setPasswordUpdateError(t('admin.password_min_length'));
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordUpdateError(t('admin.passwords_do_not_match'));
+      return;
+    }
+
+    setPasswordUpdating(true);
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    setPasswordUpdating(false);
+
+    if (updateError) {
+      setPasswordUpdateError(updateError.message);
+      return;
+    }
+
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordUpdateMessage(t('admin.password_updated'));
   }
 
   async function loadQuestions(testId: string) {
@@ -295,6 +330,17 @@ export function Admin() {
             <LanguageSwitcher />
             <button
               onClick={() => {
+                setPasswordUpdateError('');
+                setPasswordUpdateMessage('');
+                setShowPasswordDialog(true);
+              }}
+              className="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-700"
+            >
+              <Lock className="w-4 h-4" />
+              {t('admin.set_password')}
+            </button>
+            <button
+              onClick={() => {
                 logout();
               }}
               className="text-sm text-gray-500 hover:text-gray-700"
@@ -304,6 +350,75 @@ export function Admin() {
           </div>
         </div>
       </header>
+
+      {showPasswordDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="password-dialog-title"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+          >
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <h2 id="password-dialog-title" className="text-xl font-semibold text-gray-900">
+                {t('admin.set_password_title')}
+              </h2>
+              <button
+                type="button"
+                aria-label={t('admin.cancel')}
+                onClick={() => setShowPasswordDialog(false)}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handlePasswordUpdate} className="space-y-4">
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder={t('admin.new_password')}
+                autoComplete="new-password"
+                className="w-full rounded-lg border border-gray-200 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                autoFocus
+              />
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder={t('admin.confirm_password')}
+                autoComplete="new-password"
+                className="w-full rounded-lg border border-gray-200 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+
+              {passwordUpdateError && (
+                <p className="text-sm text-red-600">{passwordUpdateError}</p>
+              )}
+              {passwordUpdateMessage && (
+                <p className="text-sm text-green-600">{passwordUpdateMessage}</p>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordDialog(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+                >
+                  {t('admin.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={passwordUpdating || !newPassword || !confirmPassword}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {passwordUpdating ? t('admin.saving') : t('admin.set_password')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* Tabs */}
