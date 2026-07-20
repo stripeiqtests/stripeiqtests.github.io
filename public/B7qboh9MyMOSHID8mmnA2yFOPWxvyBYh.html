@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    />
+    <title>Отчёт по безопасности — inner-code.me</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172033;
+        --muted: #61708b;
+        --line: #dfe6f1;
+        --surface: #ffffff;
+        --surface-soft: #f5f8fc;
+        --primary: #4f46e5;
+        --primary-dark: #3730a3;
+        --success: #087a55;
+        --success-soft: #e9f8f2;
+        --danger: #b42318;
+        --danger-soft: #fff0ee;
+        --shadow: 0 24px 70px rgba(36, 48, 79, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        background: #edf2f9;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.6;
+        background:
+          radial-gradient(circle at 10% 0%, rgba(79, 70, 229, 0.14), transparent 34rem),
+          radial-gradient(circle at 100% 18%, rgba(14, 165, 233, 0.11), transparent 30rem),
+          #edf2f9;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 48px auto;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        border-radius: 28px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      header {
+        position: relative;
+        padding: 64px 64px 56px;
+        color: #fff;
+        background:
+          linear-gradient(120deg, rgba(79, 70, 229, 0.96), rgba(30, 64, 175, 0.94)),
+          #4338ca;
+      }
+
+      header::after {
+        position: absolute;
+        right: -80px;
+        bottom: -160px;
+        width: 360px;
+        height: 360px;
+        border: 58px solid rgba(255, 255, 255, 0.08);
+        border-radius: 50%;
+        content: "";
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 20px;
+        padding: 7px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #78f0c2;
+        box-shadow: 0 0 0 5px rgba(120, 240, 194, 0.14);
+        content: "";
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        position: relative;
+        z-index: 1;
+        max-width: 760px;
+        margin-bottom: 18px;
+        font-size: clamp(36px, 6vw, 64px);
+        line-height: 1.02;
+        letter-spacing: -0.045em;
+      }
+
+      .lead {
+        position: relative;
+        z-index: 1;
+        max-width: 760px;
+        margin-bottom: 0;
+        color: rgba(255, 255, 255, 0.82);
+        font-size: clamp(17px, 2.2vw, 21px);
+      }
+
+      .content {
+        padding: 56px 64px 64px;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 18px;
+        align-items: start;
+        margin-bottom: 52px;
+        padding: 24px;
+        border: 1px solid #b8ead8;
+        border-radius: 18px;
+        background: var(--success-soft);
+      }
+
+      .summary-icon {
+        display: grid;
+        width: 44px;
+        height: 44px;
+        place-items: center;
+        border-radius: 14px;
+        color: #fff;
+        background: var(--success);
+        font-size: 24px;
+        font-weight: 800;
+      }
+
+      .summary strong {
+        display: block;
+        margin-bottom: 4px;
+        color: #075c43;
+        font-size: 18px;
+      }
+
+      .summary p {
+        margin-bottom: 0;
+        color: #286b58;
+      }
+
+      section + section {
+        margin-top: 56px;
+      }
+
+      h2 {
+        margin-bottom: 22px;
+        font-size: clamp(26px, 3vw, 34px);
+        line-height: 1.2;
+        letter-spacing: -0.025em;
+      }
+
+      h3 {
+        margin-bottom: 8px;
+        font-size: 17px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 15px;
+      }
+
+      th,
+      td {
+        padding: 18px 20px;
+        vertical-align: top;
+        text-align: left;
+      }
+
+      th {
+        color: #41506b;
+        background: var(--surface-soft);
+        font-size: 12px;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+
+      tr + tr td {
+        border-top: 1px solid var(--line);
+      }
+
+      tbody tr:hover {
+        background: #fafcff;
+      }
+
+      .before {
+        color: var(--danger);
+        font-weight: 650;
+      }
+
+      .after {
+        color: var(--success);
+        font-weight: 650;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--surface-soft);
+      }
+
+      .card p {
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      .format-box {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+
+      .format-box > div {
+        padding: 26px;
+        border-radius: 18px;
+      }
+
+      .safe {
+        border: 1px solid #b8ead8;
+        background: var(--success-soft);
+      }
+
+      .compatibility {
+        border: 1px solid #d9d4ff;
+        background: #f2f0ff;
+      }
+
+      .format-box p {
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 22px 64px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        background: var(--surface-soft);
+        font-size: 13px;
+      }
+
+      @media (max-width: 760px) {
+        main {
+          width: min(100% - 20px, 1120px);
+          margin: 10px auto;
+          border-radius: 20px;
+        }
+
+        header,
+        .content {
+          padding: 38px 24px;
+        }
+
+        .cards,
+        .format-box {
+          grid-template-columns: 1fr;
+        }
+
+        .summary {
+          grid-template-columns: 1fr;
+        }
+
+        th,
+        td {
+          min-width: 220px;
+          padding: 15px;
+        }
+
+        footer {
+          flex-direction: column;
+          padding: 20px 24px;
+        }
+      }
+
+      @media print {
+        html,
+        body {
+          background: #fff;
+        }
+
+        main {
+          width: 100%;
+          margin: 0;
+          border: 0;
+          box-shadow: none;
+        }
+
+        tbody tr:hover {
+          background: transparent;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Security hardening</div>
+        <h1>Отчёт по усилению безопасности</h1>
+        <p class="lead">
+          Краткое описание основных high-ROI изменений, выполненных для
+          inner-code.me.
+        </p>
+      </header>
+
+      <div class="content">
+        <div class="summary">
+          <div class="summary-icon" aria-hidden="true">✓</div>
+          <div>
+            <strong>Основной high-ROI этап завершён</strong>
+            <p>
+              Закрыты наиболее значимые проблемы с административным доступом,
+              правильными ответами, результатами тестов, оплатой, редактируемым
+              HTML и правами записи в базу.
+            </p>
+          </div>
+        </div>
+
+        <section>
+          <h2>Что было исправлено</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Было</th>
+                  <th scope="col">Что сделано</th>
+                  <th scope="col">Результат</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="before">Общий пароль администратора хранился в базе, а вход отмечался в браузере.</td>
+                  <td class="after">Вход переведён на Supabase Auth с e-mail, паролем и серверной проверкой роли администратора.</td>
+                  <td>Нельзя открыть админку простой подменой данных в браузере или прочитать общий пароль из базы.</td>
+                </tr>
+                <tr>
+                  <td class="before">Анонимные посетители имели слишком широкие права на таблицы.</td>
+                  <td class="after">Включены строгие правила доступа — RLS.</td>
+                  <td>Посетитель не может изменять тесты, вопросы, настройки и чужие результаты.</td>
+                </tr>
+                <tr>
+                  <td class="before">Правильные ответы можно было получить вместе с вопросами.</td>
+                  <td class="after">Публичный API отдаёт вопросы без <code>correct_answer</code>, а подсчёт выполняется на сервере.</td>
+                  <td>Нельзя заранее скачать ответы или подделать итоговый балл на стороне браузера.</td>
+                </tr>
+                <tr>
+                  <td class="before">Для доступа к результату было достаточно узнать ID сессии.</td>
+                  <td class="after">Каждой сессии выдаётся отдельный случайный <code>access_token</code>.</td>
+                  <td>Зная только адрес или ID, нельзя прочитать чужой результат, e-mail и ответы.</td>
+                </tr>
+                <tr>
+                  <td class="before">Оплату можно было попытаться создать для чужой сессии.</td>
+                  <td class="after">Checkout проверяет пару <code>sessionId + accessToken</code>.</td>
+                  <td>Нельзя связать оплату с чужим результатом без секретного токена этой сессии.</td>
+                </tr>
+                <tr>
+                  <td class="before">Отправку результатов по e-mail можно было вызвать напрямую.</td>
+                  <td class="after">Функция принимает запросы только от доверенной серверной части.</td>
+                  <td>Посторонний не сможет использовать её для рассылки или получения чужих данных.</td>
+                </tr>
+                <tr>
+                  <td class="before">Редактируемый HTML мог содержать исполняемый код.</td>
+                  <td class="after">HTML по умолчанию отображается как текст, а форматирование обрабатывается безопасным парсером.</td>
+                  <td>Закрыта XSS-уязвимость: скрипты и обработчики событий не исполняются.</td>
+                </tr>
+                <tr>
+                  <td class="before">Загрузка и удаление изображений были слишком открыты.</td>
+                  <td class="after">Публичным оставлен только просмотр; изменение разрешено администратору.</td>
+                  <td>Посетитель не сможет заменить или удалить изображения вопросов.</td>
+                </tr>
+                <tr>
+                  <td class="before">В логах и аналитике могли появляться лишние идентификаторы.</td>
+                  <td class="after">Убрано логирование e-mail и передача ID тестовой сессии как идентификатора транзакции.</td>
+                  <td>Снижен риск утечки персональных данных через служебные системы.</td>
+                </tr>
+                <tr>
+                  <td class="before">В проекте оставались старые функции и чувствительные служебные файлы.</td>
+                  <td class="after">Устаревшие функции и временные артефакты удалены, примеры конфигурации очищены.</td>
+                  <td>Уменьшена общая поверхность атаки.</td>
+                </tr>
+                <tr>
+                  <td class="before">Защитные проверки выполнялись вручную.</td>
+                  <td class="after">Security-регрессии, безопасное форматирование, линтер и сборка добавлены в публикацию.</td>
+                  <td>Опасные части сложнее случайно вернуть будущим изменением.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section>
+          <h2>Что изменилось для пользователей</h2>
+          <div class="cards">
+            <article class="card">
+              <h3>Прохождение теста</h3>
+              <p>Аккаунт по-прежнему не требуется. Вопросы и отправка ответов работают по прежнему сценарию.</p>
+            </article>
+            <article class="card">
+              <h3>Оплата и результаты</h3>
+              <p>Дополнительный защитный токен сохраняется браузером автоматически и не требует действий пользователя.</p>
+            </article>
+            <article class="card">
+              <h3>Ссылка на результат</h3>
+              <p>После открытия секретная часть ссылки переносится во временное хранилище и удаляется из адресной строки.</p>
+            </article>
+            <article class="card">
+              <h3>Административная панель</h3>
+              <p>Вместо общего пароля теперь используется настоящий аккаунт администратора с e-mail и паролем.</p>
+            </article>
+          </div>
+        </section>
+
+        <section>
+          <h2>Безопасное форматирование контента</h2>
+          <div class="format-box">
+            <div class="safe">
+              <h3>Основной режим</h3>
+              <p>
+                Произвольный HTML не исполняется. Поддерживаются безопасные
+                абзацы, списки, разделители и выделение жирным.
+              </p>
+            </div>
+            <div class="compatibility">
+              <h3>Подготовленный откат</h3>
+              <p>
+                При проблемах со старым контентом можно временно включить режим
+                совместимости. Он допускает небольшой набор HTML, продолжая
+                удалять опасные теги и атрибуты.
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <footer>
+        <span>inner-code.me · Security hardening report</span>
+        <span>Июль 2026</span>
+      </footer>
+    </main>
+  </body>
+</html>
