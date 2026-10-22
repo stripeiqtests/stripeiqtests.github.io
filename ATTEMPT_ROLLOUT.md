@@ -1,6 +1,8 @@
 # Pinned attempts release
 
-Prepared and tested locally. These changes are not applied to production.
+The pinned-attempt and image-limit migrations were explicitly approved and
+applied to production on 2026-10-23 (Europe/Minsk); all eight read-only checks
+passed. Frontend release and legacy RPC cutover are still pending.
 Target: IQ Tests / `afsoyuczexiztsjntkvi` only. Never replay the entire migration
 directory against its manually managed schema.
 
@@ -37,10 +39,11 @@ do not claim per-person rate limiting or unlimited free-tier capacity.
 ## Coordinated rollout
 
 1. Pass lint, build, browser, Edge and PostgreSQL gates. Back up the live schema/data.
-2. Review/apply only `20261022205025_pinned_test_attempts.sql` after the already
-   applied audit/payment patches. It adds private tables and a nullable version
-   column; it preserves existing results/questions. Apply the separate image
-   limits patch when releasing the validated upload UI.
+   Full DB + Storage backup/restore is still open under A21; function source
+   copies alone do not satisfy it.
+2. Database step completed: `20261022205025_pinned_test_attempts.sql` adds private
+   tables and a nullable version column; existing results/questions are preserved.
+   The image limits patch is also applied. Do not repeat their CREATE statements.
 3. Deploy/verify the matching payment functions and frontend. Follow
    `PAYMENT_ROLLOUT.md` for webhook and email worker acceptance.
 4. Verify through the real Data API: anonymous start hides correct answers;

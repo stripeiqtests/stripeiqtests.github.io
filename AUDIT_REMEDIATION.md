@@ -25,6 +25,14 @@ returns none; unpaid answers/scores remain hidden; no orders or mail jobs were
 created by applying the patch. Matching Edge functions and worker/webhook setup
 are still pending. Do not reapply this migration's CREATE statements.
 
+On 2026-10-23 (Europe/Minsk), the user separately approved both
+`20261022205025_pinned_test_attempts.sql` and
+`20261022204510_normalize_image_bucket_limits.sql`. Both executed successfully.
+Eight read-only access/configuration checks passed; tests/questions remain 2/21,
+with zero attempt/version rows created by installation. The legacy submission
+grant remains intentionally open until the new frontend is released. Recorded
+hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
+
 ## Status by audit item
 
 | Item | Implemented / evidence | Still required |
@@ -36,11 +44,11 @@ are still pending. Do not reapply this migration's CREATE statements.
 | A05 destructive test removal | Archive UI, restore flow, retained questions; browser + SQL tests | Frontend release |
 | A06 result recovery | Explicit private-link copy, blocked-storage fallback, queued email contains recovery link | Deploy queue; independent email-based recovery flow still open |
 | A07 false content/settings saves | Atomic upserts and surfaced failures; browser tests | Release |
-| A08 lost drafts | Expiring local drafts, pinned server attempt and restart UI; reload/ambiguous submission browser tests | Schema/frontend rollout |
+| A08 lost drafts | Expiring local drafts, pinned server attempt and restart UI; reload/ambiguous submission browser tests; schema applied | Frontend rollout |
 | A09 missing error states | Question schema validation, retry screens, ErrorBoundary; bounded Home fetch; result retry/storage tests and delayed earlier-result regression | Release |
 | A10 admin validation | Price/options/correct answer/number validation, save locks and errors; image format/signature/decode/size/dimensions validated | Broader validation coverage and release |
 | A11 changing slug | Existing slug retained on title change; browser test | Release |
-| A12 live question mutation | Private immutable question/scoring/price versions; archive resume; SQL + browser tests, concurrent submission test | Apply pinned-attempt migration and release frontend; real Data API check |
+| A12 live question mutation | Private immutable question/scoring/price versions; archive resume; SQL + browser tests, concurrent submission test; migration applied; real preview started/resumed the attempt and loaded all 21 questions | Release frontend; finish approved production submission smoke test |
 | A13 email failures | Durable leased outbox, bounded retries, immutable provider payload, localized factual email; Deno + SQL tests | Private scheduler/secret, failure monitoring, real provider test |
 | A14 score interpretation | Neutral percentage wording, ties/zero handled; result helper tests; email fixed | Release; review editable legacy copy |
 | A15 tracking consent | No eager tracking, explicit allow/decline/revoke; browser network test; Inter now self-hosted | Release |
@@ -50,14 +58,14 @@ are still pending. Do not reapply this migration's CREATE statements.
 | A19 accessibility | Language attribute, option/progress semantics, focus and contrast fixes | Full keyboard and contrast review |
 | A20 monitoring | Existing free 6h read-only check remains | Storage/database coverage, staleness, chosen alert channel |
 | A21 backups | Not implemented | Encrypted DB + Storage backup and restore drill |
-| A22 schema/CI | Baseline, clean real PostgreSQL migration/RLS/scoring checks, browser/Edge deployment gates; PR CI passed for 51a162a | Reconcile live migration history; verify packaging/PG-major follow-up |
+| A22 schema/CI | Baseline, clean real PostgreSQL migration/RLS/scoring checks, browser/Edge deployment gates; full PR CI passed for 1eff085 including production-major and Edge bundle gates | Reconcile live migration history |
 | A23 dependency advisories | Compatible dependency updates, DOMPurify 3.4.17; pnpm audit reports zero advisories; build/browser checks passed | Release; track deprecated ESLint 9 separately |
-| A24 anonymous abuse | Private attempt capability, bounded snapshot/answer sizes, UTC admission quotas, shared versions, abandoned-attempt cleanup; real anon/auth and concurrent SQL checks | Schema/frontend rollout and explicit legacy RPC cutover; monitor quota exhaustion; stronger bot controls remain open |
+| A24 anonymous abuse | Private attempt capability, bounded snapshot/answer sizes, UTC admission quotas, shared versions, abandoned-attempt cleanup; real anon/auth and concurrent SQL checks; schema applied | Frontend rollout and explicit legacy RPC cutover; monitor quota exhaustion; stronger bot controls remain open |
 | A25 security headers/logging | Capability log removed; no-store responses; sanitized logs; CSP/HSTS/frame/referrer headers verified on actual Cloudflare preview | Coordinate production hosting rollout |
 | A26 routes/metadata | Route titles, canonical/noindex; Cloudflare preview direct /privacy returns HTTP 200 and renders app under CSP | Live domain still uses GitHub Pages and returns 404 on direct routes; hosting rollout |
 | A27 duplicate analytics | Consent-gated purchase, stable SHA-256 transaction identifier | Result/payment browser scenarios, release |
 | A28 locale/support/demo | Public support configurable in admin; locale-preserving payment email; admin preview gated | Remaining missing translations and source question language |
-| A29 upload/orphan quota | Format/signature/decode/size/dimension validation; cancel cleans only editor-owned uploads; saved/ambiguous writes preserved; 5 browser tests passed; normalization migration prepared | Release frontend and upload limits; reference-aware GC review for old orphans |
+| A29 upload/orphan quota | Format/signature/decode/size/dimension validation; cancel cleans only editor-owned uploads; saved/ambiguous writes preserved; 5 browser tests passed; upload limits applied | Release frontend; reference-aware GC review for old orphans |
 
 ## Validation already exercised
 
@@ -70,6 +78,7 @@ are still pending. Do not reapply this migration's CREATE statements.
 - Two additional connections submitted one admitted attempt concurrently: exactly one result; real anon/authenticated RPC calls, abandoned-attempt retention and the explicit legacy cutover also passed.
 - Read-only live preflight reported PostgreSQL 17.6; the same full database suite subsequently passed on PostgreSQL 17 as well as 15. The runner now defaults to the production major.
 - The Docker fixture models SQL platform schemas; it does not replace a full Supabase HTTP or real Stripe/Resend integration test.
+- The real branch preview called the production attempt API, loaded all 21 questions, and restored an answer/current question after reload. Final result creation was stopped by automatic approval review, pending explicit permission to write one production QA result; no payment/email was initiated.
 
 ## Payment rollout boundary
 
@@ -78,10 +87,10 @@ webhook/worker setup and frontend release remain pending. They require a reviewe
 coordinated rollout and test-mode integration evidence.
 Free-tier keep-alive reduces pause risk; it cannot guarantee a free project remains active.
 
-`ATTEMPT_ROLLOUT.md` describes the prepared pinned-attempt migration and the
-separate post-frontend legacy RPC cutover. Neither is applied to production yet.
-The prepared image-limit normalization is also pending. The draft branch preview
-cannot exercise these new APIs against production until their schema is installed.
+`ATTEMPT_ROLLOUT.md` describes the applied pinned-attempt migration and the
+separate post-frontend legacy RPC cutover. Only the latter is still pending.
+Image-limit normalization is also applied. Browser/Data API acceptance remains
+distinct from the successful schema/access checks.
 
 ## Existing Cloudflare preview
 
