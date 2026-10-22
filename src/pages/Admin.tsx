@@ -2,7 +2,7 @@ import { useCallback, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { generateSlug } from '../lib/utils';
 import type { Test, Question } from '../lib/supabase';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Brain, Lock, Plus, Edit2, Trash2, Save, X,
   Eye, EyeOff, ChevronDown, ChevronUp, ArrowLeft, FileText, Settings,
@@ -31,10 +31,20 @@ export function Admin() {
   // Test management state
   const [tests, setTests] = useState<Test[]>([]);
   const [questions, setQuestions] = useState<Record<string, Question[]>>({});
-  const [expandedTest, setExpandedTest] = useState<string | null>(null);
+  // Undefined follows the initial default; null preserves a manual collapse.
+  const [expandedTest, setExpandedTest] = useState<string | null | undefined>();
 
   // Edit states
-  const [editingTest, setEditingTest] = useState<Test | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editingTestId = searchParams.get('editTest');
+  function setEditingTest(testId: string | null) {
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      if (testId) next.set('editTest', testId);
+      else next.delete('editTest');
+      return next;
+    }, { replace: true });
+  }
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [newTest, setNewTest] = useState(false);
   const [newQuestion, setNewQuestion] = useState<string | null>(null); // test_id for new question
@@ -49,6 +59,11 @@ export function Admin() {
     return 'tests';
   };
   const activeTab = getActiveTab();
+  const activeTests = tests.filter(test => test.is_active);
+  const editTarget = tests.find(test => test.id === editingTestId);
+  const expandedTestId = editTarget?.id ?? (expandedTest === undefined
+    ? (activeTests.length === 1 ? activeTests[0].id : null)
+    : expandedTest);
 
   const loadTests = useCallback(async () => {
     const { data, error } = await supabase
@@ -112,7 +127,7 @@ export function Admin() {
     setPasswordUpdateMessage(t('admin.password_updated'));
   }
 
-  async function loadQuestions(testId: string) {
+  const loadQuestions = useCallback(async (testId: string) => {
     const { data, error } = await supabase
       .from('questions')
       .select('*')
@@ -122,7 +137,15 @@ export function Admin() {
     if (!error && data) {
       setQuestions(prev => ({ ...prev, [testId]: data }));
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'tests' && expandedTestId && !questions[expandedTestId]) {
+      // The request updates questions asynchronously after the response.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void loadQuestions(expandedTestId);
+    }
+  }, [isAdmin, activeTab, expandedTestId, questions, loadQuestions]);
 
   async function toggleTestActive(test: Test) {
     const { error } = await supabase
@@ -237,13 +260,10 @@ export function Admin() {
   }
 
   function handleExpandTest(testId: string) {
-    if (expandedTest === testId) {
+    if (expandedTestId === testId) {
       setExpandedTest(null);
     } else {
       setExpandedTest(testId);
-      if (!questions[testId]) {
-        loadQuestions(testId);
-      }
     }
   }
 
@@ -510,7 +530,7 @@ export function Admin() {
               {tests.map((test) => (
                 <div key={test.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                   {/* Test Header */}
-                  {editingTest?.id === test.id ? (
+                  {editingTestId === test.id ? (
                     <TestForm
                       test={test}
                       onSave={(t) => saveTest(t)}
@@ -546,7 +566,7 @@ export function Admin() {
                             {test.is_active ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                           </button>
                           <button
-                            onClick={() => setEditingTest(test)}
+                            onClick={() => setEditingTest(test.id)}
                             className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                             title={t('admin.edit')}
                           >
@@ -563,8 +583,10 @@ export function Admin() {
                             onClick={() => handleExpandTest(test.id)}
                             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
                             title={t('admin.questions')}
+                            aria-expanded={expandedTestId === test.id}
+                            aria-controls={`test-questions-${test.id}`}
                           >
-                            {expandedTest === test.id ? (
+                            {expandedTestId === test.id ? (
                               <ChevronUp className="w-5 h-5" />
                             ) : (
                               <ChevronDown className="w-5 h-5" />
@@ -576,8 +598,8 @@ export function Admin() {
                   )}
 
                   {/* Questions Section */}
-                  {expandedTest === test.id && (
-                    <div className="border-t border-gray-200 bg-gray-50 p-4">
+                  {expandedTestId === test.id && (
+                    <div id={`test-questions-${test.id}`} className="border-t border-gray-200 bg-gray-50 p-4">
                       <div className="flex justify-between items-center mb-4">
                         <h4 className="font-medium text-gray-700">{t('admin.questions')} ({questions[test.id]?.length || 0})</h4>
                         <button
@@ -699,12 +721,15 @@ function TestForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={t('admin.test_title')}
+          aria-label={t('admin.test_title')}
+          autoFocus
           className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={t('admin.test_description')}
+          aria-label={t('admin.test_description')}
           rows={2}
           className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
@@ -723,6 +748,7 @@ function TestForm({
       <div className="flex justify-end gap-2 mt-4">
         <button
           onClick={onCancel}
+          aria-label={t('admin.cancel')}
           className="px-4 py-2 text-gray-600 hover:text-gray-800"
         >
           <X className="w-5 h-5" />

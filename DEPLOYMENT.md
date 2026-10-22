@@ -143,3 +143,45 @@ HTML. Use `RICH_TEXT_COMPATIBILITY_MODE=true` separately for result emails.
    administrator can.
 6. Confirm the results email renders expected formatting and script/event
    attributes are removed.
+
+## Storage recovery and idle operation
+
+The frontend uploads question illustrations to the public `images` bucket in
+production project `afsoyuczexiztsjntkvi`. Database tables and RLS policies alone
+are insufficient: the bucket must exist too. A project being paused is a separate
+condition from `StorageApiError: Bucket not found`.
+
+After migration or recovery, apply
+`supabase/migrations/20261022000000_restore_question_image_bucket.sql` and run
+`supabase/tests/storage_readiness.sql` as the read-only readiness gate. The new
+bucket accepts images up to 5 MiB. The migration is safe to repeat and preserves
+existing buckets and policies. Never restore the legacy unrestricted upload
+policy from the original January migration.
+
+Verify a small image upload in the administrator UI, open its public URL, then
+cancel the unsaved question edit. Also verify that an anonymous upload is denied.
+Do not mark recovery complete based only on a working home page or table query.
+
+Supabase Free can pause after insufficient database activity over seven days.
+Pro removes automatic inactivity pausing; it does not replace backups or health
+checks. On Free, an independent always-on scheduler can perform a small read of
+public test metadata and check a known public Storage object every six hours, alerting on
+failure. Never place service-role credentials in a public monitor.
+
+Do not rely solely on GitHub Actions scheduled workflows for extended idle
+periods: GitHub disables public-repository schedules after 60 days without
+repository activity. Run production monitoring independently from that schedule
+and from a developer laptop. Scheduled requests are not an uptime guarantee.
+
+Maintain separate backups of database schema/data and Storage files. A database
+backup does not include the stored object bytes. Verify both after recovery.
+
+References:
+- https://supabase.com/docs/guides/platform/free-project-pausing
+- https://supabase.com/docs/guides/storage/buckets/fundamentals
+- https://supabase.com/docs/guides/platform/backups
+- https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows
+
+The free monitor is installed on the existing VPS as "inner-code-health.timer".
+See [ops/health/README.md](ops/health/README.md) for the schedule, checks, status
+commands and rollback. It is independent of GitHub and the developer laptop.

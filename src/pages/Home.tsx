@@ -359,7 +359,7 @@ export function Home() {
                 {/* Admin Edit Button */}
                 {isAdmin && (
                   <Link
-                    to="/admin"
+                    to={`/admin/tests?editTest=${encodeURIComponent(test.id)}`}
                     className="absolute top-3 right-3 p-2 rounded-full bg-amber-100 text-amber-600 hover:bg-amber-200 transition-colors border border-amber-200"
                     title={lang === 'ru' ? 'Редактировать тест' : 'Edit test'}
                   >

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Inner Code every six hours independently of GitHub
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:23:00 UTC
+RandomizedDelaySec=5min
+Persistent=true
+Unit=inner-code-health.service
+
+[Install]
+WantedBy=timers.target
