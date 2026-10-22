@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { TestSession, Test, ArchetypeResult } from '../lib/supabase';
@@ -85,6 +85,7 @@ export function Results() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [showPersonalLink, setShowPersonalLink] = useState(false);
   const [paymentError, setPaymentError] = useState(false);
+  const sessionRequest=useRef(0);
 
   useEffect(() => {
     loadFollowUpTestSlug();
@@ -94,6 +95,10 @@ export function Results() {
     if (sessionId && !isPreview) {
       loadSession();
     }
+    // This is a request generation counter, not a DOM ref. Invalidate any
+    // request still in flight when the route changes or the component unmounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return ()=>{sessionRequest.current++;};
   }, [sessionId, isPreview]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadFollowUpTestSlug() {
@@ -109,7 +114,7 @@ export function Results() {
   }
 
   // Load archetype result based on strongest dimension
-  async function loadArchetypeResult(sess: TestSession) {
+  async function loadArchetypeResult(sess: TestSession,request:number) {
     const scores = [
       { dimension: 'analyst', score: sess.analyst_score || 0 },
       { dimension: 'strategist', score: sess.strategist_score || 0 },
@@ -118,7 +123,7 @@ export function Results() {
     ];
     const strongest = scores.reduce((max, s) => s.score > max.score ? s : max);
     if (!sess.is_paid || strongest.score <= 0 || scores.filter(s => s.score === strongest.score).length > 1) {
-      setArchetypeResult(null);
+      if(request===sessionRequest.current)setArchetypeResult(null);
       return;
     }
 
@@ -126,9 +131,10 @@ export function Results() {
       .from('archetype_results')
       .select('*')
       .eq('dimension', strongest.dimension)
+      .abortSignal(AbortSignal.timeout(8000))
       .single();
 
-    if (!error && data) {
+    if (request===sessionRequest.current && !error && data) {
       setArchetypeResult(data);
     }
   }
@@ -136,7 +142,10 @@ export function Results() {
 
   async function loadSession() {
     if (!sessionId) return;
-    setLoading(true); setAccessError(null);
+    const request=++sessionRequest.current;
+    setLoading(true); setAccessError(null);setTest(null);setArchetypeResult(null);
+    setAccessToken(null);setProcessingPayment(false);setPaymentError(false);setShowPersonalLink(false);setLinkCopied(false);
+    try {
     const token = readSessionAccess(sessionId);
     if (!token) {
       setAccessError('missing-token');
@@ -150,7 +159,10 @@ export function Results() {
         p_session_id: sessionId,
         p_access_token: token,
       })
+      .abortSignal(AbortSignal.timeout(8000))
       .single();
+
+    if(request!==sessionRequest.current)return;
 
     const sessionData = rawSessionData as TestSession | null;
 
@@ -160,27 +172,33 @@ export function Results() {
       return;
     }
 
-    const {data:context} = await supabase.rpc('get_result_context', {
+    const {data:context,error:contextError} = await supabase.rpc('get_result_context', {
       p_session_id:sessionId,p_access_token:token,
-    }).maybeSingle<{test:Test;email_status:TestSession['email_status']}>();
+    }).abortSignal(AbortSignal.timeout(8000)).maybeSingle<{test:Test;email_status:TestSession['email_status']}>();
+    if(request!==sessionRequest.current)return;
+    if(contextError)throw contextError;
     const deliveryStatus = context?.email_status;
     setSession({...sessionData,email_status:typeof deliveryStatus==='string' && ['pending','sending','sent','failed'].includes(deliveryStatus) ? deliveryStatus : null});
 
     // Load archetype result based on scores
-    loadArchetypeResult(sessionData);
+    void loadArchetypeResult(sessionData,request);
 
     // Load test info
     const { data: testData } = context?.test ? {data:context.test as Test} : await supabase
       .from('tests')
       .select('*')
       .eq('id', sessionData.test_id)
+      .retry(false)
+      .abortSignal(AbortSignal.timeout(8000))
       .single();
 
+    if(request!==sessionRequest.current)return;
     if (testData) {
       setTest(testData);
     }
 
-    setLoading(false);
+    }catch{if(request===sessionRequest.current)setAccessError('network');}
+    finally{if(request===sessionRequest.current)setLoading(false);}
   }
 
   async function handlePayment() {

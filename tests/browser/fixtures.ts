@@ -9,6 +9,9 @@ export interface FixtureApi {
   content: Record<string, string>;
   settings: Record<string, string>;
   failQuestions: boolean;
+  limitAttempts?:boolean;
+  failSubmissionOnce?:boolean;
+  submissions?:number;
   failTests?:boolean;
   failWrites: boolean;
   requests: { path: string; method: string; body: Record<string, unknown> | null }[];
@@ -23,6 +26,7 @@ const jwt = [Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url'), B
 export const test = base.extend<{ api: FixtureApi }>({
   api: [async ({ context }, use) => {
     const api: FixtureApi = { test: { ...activeTest }, questions: structuredClone(questions), content: {}, settings: { language_mode: 'ru', support_contact: 'stripeiqtests@proton.me', follow_up_test_slug: '' }, failQuestions: false, failWrites: false, requests: [], tracking: [],result:null,emailStatus:null,failResults:false };
+    const attempts=new Map<string,{test:typeof activeTest;questions:typeof questions;submitted:boolean}>();
     await context.route('**/*', async route => {
       const request = route.request(), url = new URL(request.url());
       if (url.origin === 'http://127.0.0.1:4173') return route.continue();
@@ -44,6 +48,24 @@ export const test = base.extend<{ api: FixtureApi }>({
         const rows = url.searchParams.get('is_active') === 'eq.true' && !api.test.is_active ? [] : [api.test];
         data = single ? rows[0] ?? null : rows;
       } else if (url.pathname === '/rest/v1/questions') data = api.questions;
+      else if(url.pathname==='/rest/v1/rpc/start_test_attempt'){
+        if(api.failQuestions)return route.fulfill({status:503,headers,contentType:'application/json',body:'{"message":"fixture service unavailable"}'});
+        const key=String(body?.p_attempt_token);
+        if(!attempts.has(key)){
+          if(api.limitAttempts)return route.fulfill({status:400,headers,contentType:'application/json',body:'{"code":"54000","message":"New attempt limit reached"}'});
+          if(!api.test.is_active)return route.fulfill({status:404,headers,contentType:'application/json',body:'{"code":"P0002","message":"Test not available"}'});
+          attempts.set(key,structuredClone({test:api.test,questions:api.questions,submitted:false}));
+        }
+        const attempt=attempts.get(key)!;
+        data={test:attempt.test,questions:attempt.questions.map(({correct_answer:_correct,...q})=>{void _correct;return q;})};
+      }else if(url.pathname==='/rest/v1/rpc/submit_test_attempt'){
+        const attempt=attempts.get(String(body?.p_attempt_token));
+        if(!attempt)return route.fulfill({status:404,headers,contentType:'application/json',body:'{"code":"P0002"}'});
+        if(!attempt.submitted){attempt.submitted=true;api.submissions=(api.submissions||0)+1;}
+        if(api.failSubmissionOnce){api.failSubmissionOnce=false;return route.fulfill({status:503,headers,contentType:'application/json',body:'{"message":"response lost after commit"}'});}
+        const row={session_id:'22222222-2222-4222-8222-222222222222',access_token:'44444444-4444-4444-8444-444444444444'};
+        data=single?row:[row];
+      }
       else if (url.pathname === '/rest/v1/rpc/get_public_questions') {
         if (api.failQuestions) return route.fulfill({ status: 503, headers, contentType: 'application/json', body: '{"message":"fixture service unavailable"}' });
         data = api.questions.map(({ correct_answer: _correct, ...q }) => { void _correct; return q; });

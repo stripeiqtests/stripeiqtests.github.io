@@ -17,22 +17,30 @@ Do not reapply the patch blindly: its named constraint already exists in product
 The dashboard's old manually managed migration history must be reconciled before
 using `supabase db push`; do not replay the whole migration directory against live.
 
+`20261022200000_payment_fulfillment.sql` was subsequently explicitly approved and
+executed in the same project. All seven read-only checks passed: both private
+tables have RLS; anon/authenticated cannot read them or execute the seven private
+RPCs; service_role can execute them; owned context is available; wrong capability
+returns none; unpaid answers/scores remain hidden; no orders or mail jobs were
+created by applying the patch. Matching Edge functions and worker/webhook setup
+are still pending. Do not reapply this migration's CREATE statements.
+
 ## Status by audit item
 
 | Item | Implemented / evidence | Still required |
 |---|---|---|
 | A01 timer/navigation race | Cancelled timer, index guard; browser rapid-click/navigation regression | Release |
 | A02 unpaid score disclosure | Production RPC masks answers and scores; SQL capability/paid tests | Monitor with release |
-| A03 discount/price changes | Immutable checkout order, canonical Stripe facts; Deno + PostgreSQL tests | Deploy payment migration/functions; Stripe test-mode round trip |
+| A03 discount/price changes | Immutable checkout order, canonical Stripe facts; Deno + PostgreSQL tests; payment migration applied | Deploy matching functions; Stripe test-mode round trip |
 | A04 independent payment fulfillment | Signed webhook shares atomic fulfillment; concurrent SQL connections test | Configure endpoint/secret, verify live delivery and retries |
 | A05 destructive test removal | Archive UI, restore flow, retained questions; browser + SQL tests | Frontend release |
 | A06 result recovery | Explicit private-link copy, blocked-storage fallback, queued email contains recovery link | Deploy queue; independent email-based recovery flow still open |
 | A07 false content/settings saves | Atomic upserts and surfaced failures; browser tests | Release |
-| A08 lost drafts | Expiring local drafts and restart UI; browser test | Server-side submission idempotency |
-| A09 missing error states | Question schema validation, retry screens, ErrorBoundary; Home distinguishes failed/empty list and bounds fetch time; result retry/storage tests | Complete stale Results/network race coverage |
-| A10 admin validation | Price/options/correct answer/number validation, save locks and errors | Broader validation tests; image validation |
+| A08 lost drafts | Expiring local drafts, pinned server attempt and restart UI; reload/ambiguous submission browser tests | Schema/frontend rollout |
+| A09 missing error states | Question schema validation, retry screens, ErrorBoundary; bounded Home fetch; result retry/storage tests and delayed earlier-result regression | Release |
+| A10 admin validation | Price/options/correct answer/number validation, save locks and errors; image format/signature/decode/size/dimensions validated | Broader validation coverage and release |
 | A11 changing slug | Existing slug retained on title change; browser test | Release |
-| A12 live question mutation | Not implemented | Pin attempt question/scoring version |
+| A12 live question mutation | Private immutable question/scoring/price versions; archive resume; SQL + browser tests, concurrent submission test | Apply pinned-attempt migration and release frontend; real Data API check |
 | A13 email failures | Durable leased outbox, bounded retries, immutable provider payload, localized factual email; Deno + SQL tests | Private scheduler/secret, failure monitoring, real provider test |
 | A14 score interpretation | Neutral percentage wording, ties/zero handled; result helper tests; email fixed | Release; review editable legacy copy |
 | A15 tracking consent | No eager tracking, explicit allow/decline/revoke; browser network test; Inter now self-hosted | Release |
@@ -42,30 +50,37 @@ using `supabase db push`; do not replay the whole migration directory against li
 | A19 accessibility | Language attribute, option/progress semantics, focus and contrast fixes | Full keyboard and contrast review |
 | A20 monitoring | Existing free 6h read-only check remains | Storage/database coverage, staleness, chosen alert channel |
 | A21 backups | Not implemented | Encrypted DB + Storage backup and restore drill |
-| A22 schema/CI | Baseline, clean real PostgreSQL migration/RLS/scoring checks, browser/Edge deployment gates, PR validation workflow | Reconcile live migration history; confirm remote CI |
+| A22 schema/CI | Baseline, clean real PostgreSQL migration/RLS/scoring checks, browser/Edge deployment gates; PR CI passed for 491cdbc | Reconcile live migration history; verify next PR revision |
 | A23 dependency advisories | Compatible dependency updates, DOMPurify 3.4.17; pnpm audit reports zero advisories; build/browser checks passed | Release; track deprecated ESLint 9 separately |
-| A24 anonymous abuse | Payment calls have private capability checks and idempotent order/fulfillment | Public attempt/submission rate limits and idempotency |
-| A25 security headers/logging | Capability console log removed; payment responses no-store; sanitized server error logs; Cloudflare header artifact with hashed inline helper | Verify CSP on preview and coordinate production hosting rollout |
-| A26 routes/metadata | Public/private route titles, canonical/noindex metadata; host-aware Cloudflare SPA fallback artifact | Preview headers/routes verification; live domain still uses GitHub Pages and returns 404 on direct routes |
+| A24 anonymous abuse | Private attempt capability, bounded snapshot/answer sizes, UTC admission quotas, shared versions, abandoned-attempt cleanup; real anon/auth and concurrent SQL checks | Schema/frontend rollout and explicit legacy RPC cutover; monitor quota exhaustion; stronger bot controls remain open |
+| A25 security headers/logging | Capability log removed; no-store responses; sanitized logs; CSP/HSTS/frame/referrer headers verified on actual Cloudflare preview | Coordinate production hosting rollout |
+| A26 routes/metadata | Route titles, canonical/noindex; Cloudflare preview direct /privacy returns HTTP 200 and renders app under CSP | Live domain still uses GitHub Pages and returns 404 on direct routes; hosting rollout |
 | A27 duplicate analytics | Consent-gated purchase, stable SHA-256 transaction identifier | Result/payment browser scenarios, release |
 | A28 locale/support/demo | Public support configurable in admin; locale-preserving payment email; admin preview gated | Remaining missing translations and source question language |
-| A29 upload/orphan quota | Not implemented | Upload validation, safe cleanup, normalized bucket limits |
+| A29 upload/orphan quota | Format/signature/decode/size/dimension validation; cancel cleans only editor-owned uploads; saved/ambiguous writes preserved; 5 browser tests passed; normalization migration prepared | Release frontend and upload limits; reference-aware GC review for old orphans |
 
 ## Validation already exercised
 
-- `pnpm test:browser`: 16 tests passed after compatible dependency updates; metadata and Home-failure cases added and exercised in a focused 11-test run.
-- `pnpm lint`, `pnpm build`, `pnpm test:security`, `pnpm test:rich-text`: passed at earlier checkpoints.
+- `pnpm test:browser`: all 27 tests passed, including pinned attempts/lost submission response, stale result requests and upload cleanup.
+- `pnpm lint`, `pnpm build`, `pnpm test:security`, `pnpm test:rich-text`, `pnpm test:hosting`: passed for this revision.
 - `deno check --config supabase/functions/deno.json` for all four payment/worker entry points passed.
 - `pnpm test:edge`: all 9 tests passed, including expired checkout recovery. No real payments/emails/network destinations used.
 - `pnpm test:database`: clean migrations, RLS/scoring/archive and payment/outbox contracts passed;
   two PostgreSQL connections raced the same payment: one first fulfillment, one idempotent repeat, one email job.
+- Two additional connections submitted one admitted attempt concurrently: exactly one result; real anon/authenticated RPC calls, abandoned-attempt retention and the explicit legacy cutover also passed.
 - The Docker fixture models SQL platform schemas; it does not replace a full Supabase HTTP or real Stripe/Resend integration test.
 
 ## Payment rollout boundary
 
-See `PAYMENT_ROLLOUT.md`. The new payment migration and Edge code are **not deployed**.
-They require a reviewed coordinated rollout and test-mode integration evidence.
+See `PAYMENT_ROLLOUT.md`. The payment migration is applied; matching Edge code,
+webhook/worker setup and frontend release remain pending. They require a reviewed
+coordinated rollout and test-mode integration evidence.
 Free-tier keep-alive reduces pause risk; it cannot guarantee a free project remains active.
+
+`ATTEMPT_ROLLOUT.md` describes the prepared pinned-attempt migration and the
+separate post-frontend legacy RPC cutover. Neither is applied to production yet.
+The prepared image-limit normalization is also pending. The draft branch preview
+cannot exercise these new APIs against production until their schema is installed.
 
 ## Existing Cloudflare preview
 
@@ -75,4 +90,7 @@ for commit `771d52c`; it served the actual app at `/privacy` with HTTP 200. The 
 of an available preview host, not a DNS migration or production release.
 The next hosting artifact adds CSP/HSTS/referrer/frame headers and uses Cloudflare's
 documented SPA fallback while retaining GitHub's redirect fallback in its own build.
-Its deployment still needs preview verification before any domain change.
+Preview `8bc006b7.inner-code-iq-test.pages.dev/privacy` was subsequently verified:
+HTTP 200; CSP with the correct inline-script hash, HSTS, no-referrer, SAMEORIGIN
+and noindex headers; the real app rendered and navigated home with no console
+errors/warnings in this read-only browser check. Production DNS has not changed.

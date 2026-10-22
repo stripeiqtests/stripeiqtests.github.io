@@ -46,7 +46,7 @@ select '11111111-1111-4111-8111-111111111111',n,'Fixture question '||n,
 const migrations = readdirSync(resolve(root, 'supabase/migrations')).filter(f => /^\d+_.+\.sql$/.test(f)).sort();
 writeFileSync(resolve(temp, 'run.sql'), '\\set ON_ERROR_STOP on\n' + platform + '\n'
   + migrations.map(file => `\\echo Applying ${file}\n\\i /migrations/${file}`).join('\n')
-  + '\n' + fixtures + '\n\\i /tests/security_rls.sql\n\\i /tests/storage_readiness.sql\n\\i /tests/audit_safety.sql\n\\i /tests/payment_fulfillment.sql\n');
+  + '\n' + fixtures + '\n\\i /tests/security_rls.sql\n\\i /tests/storage_readiness.sql\n\\i /tests/audit_safety.sql\n\\i /tests/payment_fulfillment.sql\n\\i /tests/pinned_attempts.sql\n');
 let created = false;
 try {
   docker(['run', '-d', '--name', container, '--label', `${ownerLabel}=${runId}`, '--network', 'none', '--memory', '512m', '--cpus', '1', '-e', 'POSTGRES_PASSWORD=isolated-fixture-only', '-e', 'POSTGRES_DB=app_test', 'postgres:15-alpine'], true);
@@ -92,6 +92,21 @@ try {
     if (select count(*) from public.result_email_outbox where session_id='22222222-2222-4222-8222-222222222222') <> 1 then raise exception 'Duplicate concurrent mail'; end if;
     end $$;`], true);
   console.log('PASS: simultaneous webhook/return-page fulfillment unlocks once and queues one email.');
+  const attemptToken='88888888-8888-4888-8888-888888888888';
+  docker(['exec', container, 'psql', '-U', 'postgres', '-d', 'app_test', '-v', 'ON_ERROR_STOP=1', '-c',
+    `select public.start_test_attempt('sql-fixture','${attemptToken}');`],true);
+  const submit=`select * from public.submit_test_attempt('${attemptToken}',null,
+    (select jsonb_object_agg(id::text,correct_answer) from public.questions where test_id='11111111-1111-4111-8111-111111111111'));`;
+  await Promise.all([connection(`begin; ${submit} select pg_sleep(0.25); commit;`),connection(submit)]);
+  docker(['exec', container, 'psql', '-U', 'postgres', '-d', 'app_test', '-v', 'ON_ERROR_STOP=1', '-c', `do $$ begin
+    if (select count(*) from public.test_sessions where version_id is not null)<>1 then raise exception 'Concurrent submission created duplicate results';end if;
+    if (select count(*) from public.test_attempts where result_session_id is not null)<>1 then raise exception 'Concurrent submission did not bind its result';end if;
+    end $$;`],true);
+  console.log('PASS: two simultaneous submissions of one attempt create exactly one protected result.');
+  docker(['cp',resolve(root,'supabase/operations/retire_legacy_submission.sql'),`${container}:/retire-legacy.sql`],true);
+  docker(['exec',container,'psql','-U','postgres','-d','app_test','-v','ON_ERROR_STOP=1','-f','/retire-legacy.sql'],true);
+  docker(['exec',container,'psql','-U','postgres','-d','app_test','-v','ON_ERROR_STOP=1','-f','/tests/retired_submission.sql'],true);
+  console.log('PASS: release cutover closes the legacy submission bypass and preserves anonymous pinned attempts.');
   console.log('PASS: clean migration chain, scoring, unpaid/paid disclosure, RLS, archive and Storage policy contracts.');
 } finally {
   // Remove only the isolated container created by this exact invocation.

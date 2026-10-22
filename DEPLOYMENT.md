@@ -3,8 +3,9 @@
 > **2026-10-22 audit release:** read `AUDIT_REMEDIATION.md` and
 > `PAYMENT_ROLLOUT.md` first. Production has manually applied SQL and no reconciled
 > CLI migration history. Do not blindly run the historical `db push` instructions
-> below. Only the explicitly approved `20261022190000_audit_safety.sql` has been
-> applied in this audit phase; newer payment code/migrations remain local.
+> below. The explicitly approved `20261022190000_audit_safety.sql` and
+> `20261022200000_payment_fulfillment.sql` have been applied and verified.
+> Matching payment functions and frontend release remain pending.
 
 The application is a static React frontend backed by Supabase, Stripe and
 Resend. Test takers do not need accounts. Administrators sign in through
@@ -84,13 +85,16 @@ pnpm build
 
 ## 5. Apply the database changes
 
-Link the CLI to the intended project, inspect the target, then apply all pending
-migrations:
+For a fresh environment, link the CLI to the intended project, inspect the target,
+and review pending migrations. **Production has a manually managed history**:
+the audit-safety and payment-fulfillment patches were separately approved/applied
+on 2026-10-22. Do not replay all migrations or run a blind `db push` there. Reconcile
+the recorded schema/history first and follow `PAYMENT_ROLLOUT.md` and
+`ATTEMPT_ROLLOUT.md` for the coordinated release.
 
 ```bash
 pnpm verify:production-target
 pnpm exec supabase migration list
-pnpm exec supabase db push
 ```
 
 The final hardening migration keeps public content readable, hides correct
@@ -104,11 +108,15 @@ an admin role.
 pnpm exec supabase functions deploy create-checkout --no-verify-jwt
 pnpm exec supabase functions deploy verify-payment --no-verify-jwt
 pnpm exec supabase functions deploy send-results-email --no-verify-jwt
+pnpm exec supabase functions deploy stripe-webhook --no-verify-jwt
 ```
 
 `create-checkout` and `verify-payment` are public endpoints with their own
-session/payment checks. `send-results-email` additionally requires the exact
-service-role authorization supplied by `verify-payment`.
+session/payment checks. `send-results-email` additionally requires the private
+worker secret or exact service-role authorization. `stripe-webhook` validates
+Stripe's signature against the raw request body. Each index.ts starts its HTTP
+server unconditionally; tests import handler.ts without starting a listener.
+Follow `PAYMENT_ROLLOUT.md` for secrets, scheduler and test-mode acceptance.
 
 Remove or disable legacy deployed functions that are not present in this
 repository, especially unauthenticated Typeform/listing/webhook endpoints.

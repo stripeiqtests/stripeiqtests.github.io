@@ -9,12 +9,12 @@ const adminContext = read('src/lib/AdminContext.tsx');
 const adminPage = read('src/pages/Admin.tsx');
 const testPage = read('src/pages/Test.tsx');
 const resultsPage = read('src/pages/Results.tsx');
-const checkoutFunction = read('supabase/functions/create-checkout/index.ts');
-const verifyFunction = read('supabase/functions/verify-payment/index.ts');
-const emailFunction = read('supabase/functions/send-results-email/index.ts');
+const checkoutFunction = read('supabase/functions/create-checkout/handler.ts');
+const verifyFunction = read('supabase/functions/verify-payment/handler.ts');
+const emailFunction = read('supabase/functions/send-results-email/handler.ts');
 const paymentFunctions = read('supabase/functions/_shared/payments.ts');
 const paymentMigration = read('supabase/migrations/20261022200000_payment_fulfillment.sql');
-const webhookFunction = read('supabase/functions/stripe-webhook/index.ts');
+const webhookFunction = read('supabase/functions/stripe-webhook/handler.ts');
 const supabaseConfig = read('supabase/config.toml');
 const hardeningMigration = read('supabase/migrations/20260719000000_high_roi_security_hardening.sql');
 const schema = read('supabase/schema.sql');
@@ -26,8 +26,8 @@ assert.doesNotMatch(adminContext, /localStorage\.getItem\(['"]admin_auth['"]\)/)
 assert.match(adminContext, /signInWithPassword/);
 assert.doesNotMatch(adminPage, /admin_password/);
 
-assert.match(testPage, /rpc\(['"]get_public_questions['"]/);
-assert.match(testPage, /rpc\(['"]submit_test_session['"]/);
+assert.match(testPage, /rpc\(['"]start_test_attempt['"]/);
+assert.match(testPage, /rpc\(['"]submit_test_attempt['"]/);
 assert.doesNotMatch(testPage, /\.from\(['"]test_sessions['"]\)\s*\.update/s);
 
 assert.match(resultsPage, /rpc\(['"]get_test_session['"]/);
@@ -38,6 +38,11 @@ assert.match(paymentMigration, /s\.access_token is distinct from p_access_token/
 assert.match(paymentFunctions, /resultAccessToken/);
 assert.match(verifyFunction, /fulfillPayment/);
 assert.match(webhookFunction, /constructEventAsync/);
+for(const name of ['create-checkout','verify-payment','send-results-email','stripe-webhook']){
+  const entry=read(`supabase/functions/${name}/index.ts`);
+  assert.match(entry,/Deno\.serve\(handler\)/);
+  assert.doesNotMatch(entry,/import\.meta\.main/);
+}
 assert.match(paymentMigration, /revoke all on function public\.fulfill_checkout[^;]+from public,anon,authenticated/);
 assert.match(emailFunction, /authorization.*Bearer \$\{serviceKey\}/s);
 assert.match(supabaseConfig, /\[functions\.create-checkout\][\s\S]*?verify_jwt\s*=\s*false/);

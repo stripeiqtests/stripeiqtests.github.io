@@ -1,6 +1,9 @@
 # Payment fulfillment rollout
 
 This is a reviewable release procedure, not evidence that deployment happened.
+The database migration was explicitly approved and applied on 2026-10-22; its
+seven read-only production checks passed. Edge functions, Stripe webhook setup,
+private worker and frontend deployment are still outstanding.
 Target: `afsoyuczexiztsjntkvi` only. The globally authenticated Supabase CLI account
 currently does not list this project; do not deploy with that account or switch to
 another project to make a command pass.
@@ -37,8 +40,8 @@ metadata; current editable test prices are not used to reject those payments.
 ## Release order and acceptance
 
 1. Run lint/build/browser/Edge/real PostgreSQL gates. Review SQL grants and diffs.
-2. With explicit approval, apply this new migration once; do not replay historical
-   migrations against the manually managed production database.
+2. Database step completed with explicit approval. Do not repeat its CREATE
+   statements or replay historical migrations against the manually managed database.
 3. Deploy shared modules and all matching functions to the verified target.
 4. Configure webhook and private retry worker. Use a test-mode isolated environment
    to exercise success, promo discount, 100% promo, price change after checkout,

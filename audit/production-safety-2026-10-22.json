@@ -15,6 +15,6 @@
     "unpaid_records_available_for_live_branch_verification": true
   },
   "paid_branch_evidence": "Isolated PostgreSQL: paid capability returns authoritative score; wrong capability returns no row. No paid production records existed to exercise that branch live.",
-  "new_payment_migration_applied": false,
+  "new_payment_migration_applied": true,
   "frontend_released": false
 }

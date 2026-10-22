@@ -4,8 +4,10 @@ begin
   if not exists (
     select 1 from storage.buckets
     where id = 'images' and name = 'images' and public
+      and file_size_limit between 1 and 5242880
+      and allowed_mime_types = array['image/png','image/jpeg','image/gif','image/webp']::text[]
   ) then
-    raise exception 'Question image storage is missing or not public';
+    raise exception 'Question image storage missing or has unexpected visibility/upload limits';
   end if;
 
   if not exists (

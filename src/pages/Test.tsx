@@ -10,6 +10,7 @@ import { resultPath, storeSessionAccess } from '../lib/sessionAccess';
 import { parseOptions } from '../lib/testData';
 import { readDraft, writeDraft, clearDraft, questionFingerprint, type TestDraft } from '../lib/testDraft';
 import { QuestionImage } from '../components/QuestionImage';
+import {attemptAccess,clearAttemptAccess} from '../lib/attemptAccess';
 
 export function Test() {
   const { slug } = useParams<{ slug: string }>();
@@ -26,10 +27,12 @@ export function Test() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [admissionLimited,setAdmissionLimited]=useState(false);
   const [resumed, setResumed] = useState(false);
   const [canPersist, setCanPersist] = useState(true);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draft = useRef<TestDraft | null>(null);
+  const attemptPersisted = useRef(false);
   const submitLock = useRef(false);
   const requestId = useRef(0);
   const questionHeading = useRef<HTMLHeadingElement>(null);
@@ -40,51 +43,50 @@ export function Test() {
   }, []);
   const invalidateLoad = useCallback(() => { requestId.current++; cancelAdvance(); }, [cancelAdvance]);
 
-  const loadTest = useCallback(async () => {
+  const loadTest = useCallback(async (reset=false) => {
     const request = ++requestId.current;
     cancelAdvance();
     setLoading(true);
     setLoadError(false);
+    setAdmissionLimited(false);
     try {
-    const { data: testData, error: testError } = await supabase
-      .from('tests')
-      .select('*')
-      .eq('slug', slug)
-      .eq('is_active', true)
-      .retry(false)
-      .abortSignal(AbortSignal.timeout(8000))
-      .maybeSingle();
+    if(!slug)throw new Error('Missing slug');
+    const access=attemptAccess(slug,reset);
+    const {data:rawPayload,error:attemptError}=await supabase
+      .rpc('start_test_attempt',{p_slug:slug,p_attempt_token:access.token})
+      .abortSignal(AbortSignal.timeout(8000));
+    const payload=rawPayload as {test:TestType;questions:PublicQuestion[]}|null;
 
     if (request !== requestId.current) return;
-    if (testError) throw testError;
-    if (!testData) {
+    if(attemptError){
+      if(attemptError.code==='54000')setAdmissionLimited(true);
+      if(attemptError.code!=='P0002')throw attemptError;
       setTest(null);
       setQuestions([]);
       return;
     }
+    if(!payload?.test||!Array.isArray(payload.questions))throw new Error('Invalid attempt data');
+    const testData=payload.test;
 
     setTest(testData);
 
-    // Load questions using the test's id
-    const { data: questionsData, error: questionsError } = await supabase
-      .rpc('get_public_questions', { p_test_id: testData.id });
-
-    if (request !== requestId.current) return;
-    if (questionsError || !Array.isArray(questionsData)) throw questionsError ?? new Error('Invalid question data');
-    const loaded = questionsData as PublicQuestion[];
+    const loaded=payload.questions;
     loaded.forEach(q => { parseOptions(q.options); if (!q.id || typeof q.question_text !== 'string') throw new Error('Invalid question'); });
     const fingerprint = questionFingerprint(loaded);
-    const saved = readDraft(testData.id, fingerprint);
+    const candidate = reset?null:readDraft(testData.id, fingerprint);
+    const saved=candidate?.attemptId===access.token?candidate:null;
     const validAnswers = Object.fromEntries(Object.entries(saved?.answers ?? {}).filter(([id, answer]) =>
       loaded.some(q => q.id === id && parseOptions(q.options).some(option => option.label === answer))));
     draft.current = saved ? { ...saved, answers: validAnswers } : {
-      attemptId: crypto.randomUUID(), fingerprint, answers: {}, currentIndex: 0, updatedAt: Date.now(),
+      attemptId: access.token, fingerprint, answers: {}, currentIndex: 0, updatedAt: Date.now(),
     };
     setQuestions(loaded);
     setAnswers(validAnswers);
     setCurrentIndex(Math.min(saved?.currentIndex ?? 0, Math.max(0, loaded.length - 1)));
     setResumed(Object.keys(validAnswers).length > 0);
     setShowEmailPrompt(false);
+    attemptPersisted.current=access.persisted;
+    setCanPersist(access.persisted);
     } catch { if (request === requestId.current) setLoadError(true); }
     finally { if (request === requestId.current) setLoading(false); }
   }, [slug, cancelAdvance]);
@@ -103,7 +105,7 @@ export function Test() {
     if (!test || !draft.current || loading || loadError) return;
     draft.current = { ...draft.current, answers, currentIndex, updatedAt: Date.now() };
     const persisted = writeDraft(test.id, draft.current);
-    setCanPersist(persisted);
+    setCanPersist(attemptPersisted.current && persisted);
   }, [answers, currentIndex, test, loading, loadError]);
 
   useEffect(() => {
@@ -121,8 +123,9 @@ export function Test() {
   function restart() {
     cancelAdvance();
     if (test) clearDraft(test.id);
-    if (draft.current) draft.current = { ...draft.current, attemptId: crypto.randomUUID(), answers: {}, currentIndex: 0, updatedAt: Date.now() };
     setAnswers({}); setCurrentIndex(0); setEmail(''); setResumed(false); setShowEmailPrompt(false);
+    draft.current=null;
+    void loadTest(true);
   }
 
   function handleAnswer(answer: string) {
@@ -155,11 +158,12 @@ export function Test() {
 
     // Score and create the protected session at the database boundary.
     const { data: rawSession, error: sessionError } = await supabase
-      .rpc('submit_test_session', {
-        p_test_id: test.id,
+      .rpc('submit_test_attempt', {
+        p_attempt_token: draft.current?.attemptId,
         p_email: email.trim() || null,
         p_answers: answers,
       })
+      .abortSignal(AbortSignal.timeout(8000))
       .single();
 
     const session = rawSession as { session_id: string; access_token: string } | null;
@@ -172,6 +176,7 @@ export function Test() {
     const accessToken = session.access_token;
     storeSessionAccess(sessionId, accessToken);
     clearDraft(test.id);
+    if(slug)clearAttemptAccess(slug);
 
     // Track test complete event
     trackTestComplete(test.id, test.title, questions.length);
@@ -230,7 +235,7 @@ export function Test() {
           </div>
 
           {submitError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
               {submitError}
             </div>
           )}
@@ -272,9 +277,9 @@ export function Test() {
             {loadError ? (lang === 'ru' ? 'Не удалось загрузить тест' : 'Could not load the test') : (lang === 'ru' ? 'Вопросы пока недоступны' : 'Questions are not available yet')}
           </h1>
           <p className="mt-2 text-gray-500">
-            {loadError ? (lang === 'ru' ? 'Проверьте подключение и попробуйте ещё раз. Сохранённые ответы останутся в браузере.' : 'Check your connection and retry. Saved answers remain in this browser.') : lang === 'ru'
-              ? 'Этот тест ещё не заполнен. Вернитесь на главную и выберите другой тест.'
-              : 'This test has not been populated yet. Return home and choose another test.'}
+            {admissionLimited ? (lang==='ru'?'Новые попытки временно ограничены из-за нагрузки. Уже начатые попытки можно продолжать. Попробуйте позже.':'New attempts are temporarily limited. Existing attempts can still continue. Please try later.') : loadError ? (lang === 'ru' ? 'Проверьте подключение и попробуйте ещё раз. Сохранённые ответы останутся в браузере.' : 'Check your connection and retry. Saved answers remain in this browser.') : lang === 'ru'
+              ? 'Новые попытки этого теста недоступны либо срок сохранённой попытки истёк. Вернитесь на главную и выберите доступный тест.'
+              : 'New attempts are unavailable or your saved attempt has expired. Return home to choose an available test.'}
           </p>
           {loadError && <button className="mt-4 mr-3 rounded-lg border border-indigo-600 px-5 py-3 text-indigo-700" onClick={() => void loadTest()}>{lang === 'ru' ? 'Повторить' : 'Retry'}</button>}
           <button

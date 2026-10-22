@@ -6,9 +6,9 @@ import {
   paymentFacts,
 } from "../_shared/payments.ts";
 import type { Database } from "../_shared/database.ts";
-import { createWebhookHandler } from "../stripe-webhook/index.ts";
+import { createWebhookHandler } from "../stripe-webhook/handler.ts";
 import { deliverEmails, renderEmail } from "../_shared/email.ts";
-import { handler as emailHandler } from "../send-results-email/index.ts";
+import { handler as emailHandler } from "../send-results-email/handler.ts";
 import { readBody } from "../_shared/http.ts";
 
 const sessionId = "22222222-2222-4222-8222-222222222222";

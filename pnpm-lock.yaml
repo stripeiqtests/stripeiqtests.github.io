@@ -15,7 +15,7 @@ importers:
         specifier: ^8.11.0
         version: 8.11.0
       '@supabase/supabase-js':
-        specifier: ^2.118.0
+        specifier: 2.118.0
         version: 2.118.0
       dompurify:
         specifier: 3.4.17

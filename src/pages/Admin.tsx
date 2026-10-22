@@ -14,6 +14,7 @@ import { AdminArchetypesTab } from '../components/AdminArchetypesTab';
 import { AdminSettingsTab } from '../components/AdminSettingsTab';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 import { parseOptions, validPrice, nextQuestionNumber } from '../lib/testData';
+import {validateQuestionImage,ImageValidationError} from '../lib/questionUpload';
 
 export function Admin() {
   const { isAdmin, authLoading, login, logout } = useAdmin();
@@ -836,6 +837,19 @@ function QuestionForm({
   const [imageUrl, setImageUrl] = useState(question?.image_url || '');
   const [useUrlInput, setUseUrlInput] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadError,setUploadError]=useState('');
+  const ownUploads=useRef(new Map<string,string>());
+  const protectedUploads=useRef(new Set<string>());
+  const formMounted=useRef(true);
+  useEffect(()=>{
+    formMounted.current=true;
+    const owned=ownUploads.current,protectedPaths=protectedUploads.current;
+    return ()=>{
+      formMounted.current=false;
+      const discarded=[...owned.keys()].filter(path=>!protectedPaths.has(path));
+      if(discarded.length)void discardNewImages(discarded);
+    };
+  },[]);
   const [options, setOptions] = useState<{ label: string; value: string }[]>(() => {
     if (!question?.options) {
       return [
@@ -867,46 +881,47 @@ function QuestionForm({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert(lang === 'ru' ? 'Пожалуйста, выберите изображение' : 'Please select an image file');
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert(lang === 'ru' ? 'Файл слишком большой (макс. 5МБ)' : 'File too large (max 5MB)');
-      return;
-    }
-
+    e.target.value='';
+    setUploadError('');
     setUploading(true);
-
+    let filePath:string|null=null;
     try {
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `question_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `questions/${fileName}`;
+      const format=await validateQuestionImage(file);
+      if(!formMounted.current)return;
+      filePath=`questions/${crypto.randomUUID()}.${format.extension}`;
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('images')
-        .upload(filePath, file);
+        .upload(filePath, file,{contentType:format.contentType,upsert:false});
 
       if (uploadError) {
         throw uploadError;
       }
+
+      if(!formMounted.current){await discardNewImages([filePath]);return;}
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('images')
         .getPublicUrl(filePath);
 
+      ownUploads.current.set(filePath,publicUrl);
       setImageUrl(publicUrl);
     } catch (error) {
-      console.error('Upload error:', error);
-      alert(lang === 'ru' ? 'Ошибка загрузки' : 'Upload failed');
+      // A failed upload may have reached Storage. This unique path was never
+      // offered to the save handler; it is safe to discard if it exists.
+      if(filePath)await discardNewImages([filePath]);
+      if(formMounted.current){
+        const ru=lang==='ru';
+        const messages={format:ru?'Поддерживаются PNG, JPEG, GIF и WebP. Проверьте формат файла.':'Use a PNG, JPEG, GIF or WebP file.',
+          size:ru?'Выберите непустое изображение размером до 5 МБ.':'Choose a non-empty image up to 5 MB.',
+          decode:ru?'Не удалось прочитать изображение. Сохраните его заново и повторите загрузку.':'The image could not be decoded. Export it again and retry.',
+          dimensions:ru?'Изображение слишком большое: максимум 8000 пикселей по стороне и 40 мегапикселей.':'Use an image no larger than 8000 pixels per side and 40 megapixels.'};
+        setUploadError(error instanceof ImageValidationError?messages[error.code]:ru?'Не удалось загрузить изображение. Проверьте подключение и повторите: текст вопроса остаётся в форме.':'The image could not upload. Check your connection and retry; your question text stays in the form.');
+      }
     } finally {
-      setUploading(false);
+      if(formMounted.current)setUploading(false);
     }
   }
 
@@ -918,6 +933,10 @@ function QuestionForm({
     <form className="bg-white p-4 rounded-lg border border-indigo-200 mb-2" onSubmit={async event => {
       event.preventDefault(); if (saveLock.current || uploading) return;
       saveLock.current = true; setSaving(true); setSaveError('');
+      // The parent unmounts this form after a successful write. Protect the
+      // chosen upload BEFORE awaiting it. On an ambiguous network failure keep
+      // it too: leaking a temporary file is safer than deleting a saved image.
+      for(const [path,url] of ownUploads.current)if(url===imageUrl)protectedUploads.current.add(path);
       try { await onSave({ id: question?.id, question_number: qNumber, question_text: text.trim(), image_url: imageUrl || null, options: JSON.stringify(options), correct_answer: correctAnswer, dimension }); }
       catch (error) { setSaveError(saveErrorMessage(error, lang)); }
       finally { saveLock.current = false; setSaving(false); }
@@ -1000,6 +1019,7 @@ function QuestionForm({
             <button
               type="button"
               onClick={handleRemoveImage}
+              aria-label={lang==='ru'?'Убрать изображение':'Remove image'}
               className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
             >
               <X className="w-3 h-3" />
@@ -1022,7 +1042,8 @@ function QuestionForm({
             <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                aria-label={lang==='ru'?'Загрузить изображение':'Upload image'}
                 onChange={handleImageUpload}
                 disabled={uploading}
                 className="hidden"
@@ -1046,6 +1067,9 @@ function QuestionForm({
           </div>
         )}
       </div>
+
+      {uploadError&&<p role="alert" className="mt-2 text-sm text-red-800">{uploadError}</p>}
+      <p className="mt-2 text-xs text-gray-600">{lang==='ru'?'PNG, JPEG, GIF или WebP; до 5 МБ, 8000 пикселей по стороне и 40 Мп.':'PNG, JPEG, GIF or WebP; up to 5 MB, 8000 pixels per side and 40 MP.'}</p>
 
       <div className="mt-3">
         <label className="text-xs text-gray-500">{t('admin.options')}</label>
@@ -1107,4 +1131,10 @@ function saveErrorMessage(error: unknown, lang: string): string {
   if (code === '42501') return lang === 'ru' ? 'Недостаточно прав. Войдите заново под администратором.' : 'Permission denied. Sign in again as an administrator.';
   if (error instanceof Error) return error.message;
   return lang === 'ru' ? 'Не удалось сохранить изменения. Проверьте подключение и попробуйте ещё раз.' : 'Could not save changes. Check your connection and retry.';
+}
+
+async function discardNewImages(paths:string[]) {
+  if(!paths.length||paths.some(path=>!/^questions\/[0-9a-f-]{36}\.(png|jpg|gif|webp)$/.test(path)))return;
+  try{const {error}=await supabase.storage.from('images').remove(paths);if(error)console.warn('Discarded image cleanup deferred');}
+  catch{console.warn('Discarded image cleanup deferred');}
 }

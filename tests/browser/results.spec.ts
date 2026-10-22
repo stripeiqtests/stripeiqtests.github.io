@@ -49,3 +49,24 @@ test('question images retry, zoom in a modal and close with Escape',async({page,
   await dialog.getByRole('slider').fill('2');await expect(dialog.getByRole('img')).toHaveAttribute('style','width: 200%; max-width: none;');
   await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();
 });
+
+test('a late response for an earlier result cannot replace the current result',async({page,api})=>{
+  const nextId='55555555-5555-4555-8555-555555555555';
+  api.result={...result,id:nextId,overall_score:12};
+  let release!:()=>void,started!:()=>void;
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  const captured=new Promise<void>(resolve=>{started=resolve;});
+  await page.route('**/rest/v1/rpc/get_test_session',async route=>{
+    if(route.request().postDataJSON().p_session_id!==id)return route.fallback();
+    started();await pending;
+    await route.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify({...result,overall_score:94})});
+  });
+  await page.goto(path);await captured;
+  await page.evaluate(url=>{history.pushState(null,'',url);window.dispatchEvent(new PopStateEvent('popstate'));},`/results/${nextId}#access_token=${token}`);
+  try{
+    await expect(page.getByText('12',{exact:true})).toBeVisible();release();
+    await page.waitForResponse(response=>response.url().endsWith('/rpc/get_test_session')&&response.request().postDataJSON()?.p_session_id===id);
+    await expect(page.getByText('12',{exact:true})).toBeVisible();
+    await expect(page.getByText('94',{exact:true})).toHaveCount(0);
+  }finally{release();}
+});
