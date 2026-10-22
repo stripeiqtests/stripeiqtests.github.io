@@ -58,6 +58,11 @@ jobs:
       - name: Payment and webhook contracts
         run: pnpm test:edge
 
+      - name: Edge entry points and dashboard bundles
+        run: |
+          pnpm check:edge
+          pnpm bundle:edge
+
       - name: Install browser for regression checks
         run: pnpm exec playwright install --with-deps chromium
 

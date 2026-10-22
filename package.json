@@ -16,6 +16,7 @@
     "test:browser": "playwright test",
     "test:database": "node scripts/test-database.mjs",
     "test:edge": "deno test --config supabase/functions/deno.json --allow-env supabase/functions/tests",
+    "check:edge": "deno check --config supabase/functions/deno.json supabase/functions/create-checkout/index.ts supabase/functions/verify-payment/index.ts supabase/functions/send-results-email/index.ts supabase/functions/stripe-webhook/index.ts",
     "test:hosting": "node --test scripts/hosting.test.mjs",
     "bundle:edge": "node scripts/bundle-edge.mjs",
     "verify:production-target": "node scripts/assert-production-target.mjs",

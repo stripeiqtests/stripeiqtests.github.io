@@ -50,7 +50,7 @@ are still pending. Do not reapply this migration's CREATE statements.
 | A19 accessibility | Language attribute, option/progress semantics, focus and contrast fixes | Full keyboard and contrast review |
 | A20 monitoring | Existing free 6h read-only check remains | Storage/database coverage, staleness, chosen alert channel |
 | A21 backups | Not implemented | Encrypted DB + Storage backup and restore drill |
-| A22 schema/CI | Baseline, clean real PostgreSQL migration/RLS/scoring checks, browser/Edge deployment gates; PR CI passed for 491cdbc | Reconcile live migration history; verify next PR revision |
+| A22 schema/CI | Baseline, clean real PostgreSQL migration/RLS/scoring checks, browser/Edge deployment gates; PR CI passed for 51a162a | Reconcile live migration history; verify packaging/PG-major follow-up |
 | A23 dependency advisories | Compatible dependency updates, DOMPurify 3.4.17; pnpm audit reports zero advisories; build/browser checks passed | Release; track deprecated ESLint 9 separately |
 | A24 anonymous abuse | Private attempt capability, bounded snapshot/answer sizes, UTC admission quotas, shared versions, abandoned-attempt cleanup; real anon/auth and concurrent SQL checks | Schema/frontend rollout and explicit legacy RPC cutover; monitor quota exhaustion; stronger bot controls remain open |
 | A25 security headers/logging | Capability log removed; no-store responses; sanitized logs; CSP/HSTS/frame/referrer headers verified on actual Cloudflare preview | Coordinate production hosting rollout |
@@ -68,6 +68,7 @@ are still pending. Do not reapply this migration's CREATE statements.
 - `pnpm test:database`: clean migrations, RLS/scoring/archive and payment/outbox contracts passed;
   two PostgreSQL connections raced the same payment: one first fulfillment, one idempotent repeat, one email job.
 - Two additional connections submitted one admitted attempt concurrently: exactly one result; real anon/authenticated RPC calls, abandoned-attempt retention and the explicit legacy cutover also passed.
+- Read-only live preflight reported PostgreSQL 17.6; the same full database suite subsequently passed on PostgreSQL 17 as well as 15. The runner now defaults to the production major.
 - The Docker fixture models SQL platform schemas; it does not replace a full Supabase HTTP or real Stripe/Resend integration test.
 
 ## Payment rollout boundary

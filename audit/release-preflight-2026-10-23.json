@@ -1,0 +1,20 @@
+{
+  "project": "afsoyuczexiztsjntkvi",
+  "method": "Read-only query in Supabase SQL Editor; function source copied through the editor without deployment",
+  "server_version": "17.6",
+  "test_count": 2,
+  "question_count": 21,
+  "audit_schema_present": true,
+  "payment_schema_present": true,
+  "pinned_attempt_schema_present": false,
+  "legacy_submission_open": true,
+  "images_file_size_limit": 5242880,
+  "images_allowed_mime_types": ["image/*"],
+  "deployed_functions": ["create-checkout", "verify-payment", "send-results-email"],
+  "prior_function_sources_saved_locally": true,
+  "existing_custom_secret_names": ["STRIPE_SECRET_KEY", "RESEND_API_KEY", "SERVICE_KEY", "APP_DOMAIN", "STRIPE_WEBHOOK_SECRET"],
+  "secret_values_revealed": false,
+  "stripe_webhook_configuration_verified": false,
+  "private_worker_secret_present": false,
+  "application_revision_ci_passed": "51a162a032543c5d325ac1f269a4b6adda0ee9ac"
+}

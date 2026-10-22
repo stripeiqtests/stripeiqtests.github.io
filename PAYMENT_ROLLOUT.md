@@ -45,6 +45,11 @@ metadata; current editable test prices are not used to reject those payments.
 - Never paste real secret values into chat, source, shell history or screenshots.
   Credential entry/creation in the browser is a user handoff when required.
 
+Live preflight found existing names `STRIPE_SECRET_KEY`, `RESEND_API_KEY`,
+`SERVICE_KEY` and `STRIPE_WEBHOOK_SECRET`. Their values were not revealed. A
+stored webhook secret name does not verify the Stripe endpoint/account/mode;
+inspect that endpoint and signed delivery before treating it as configured.
+
 ## Release order and acceptance
 
 1. Run lint/build/browser/Edge/real PostgreSQL gates. Review SQL grants and diffs.

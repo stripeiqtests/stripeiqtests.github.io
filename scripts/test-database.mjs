@@ -7,6 +7,10 @@ const root = resolve(import.meta.dirname, '..');
 const runId = randomUUID();
 const container = `inner-code-sql-test-${runId}`;
 const ownerLabel = 'inner-code.audit-test';
+// Production IQ Tests reports PostgreSQL 17.6. Keep 15 available for explicit
+// compatibility checks, but exercise the deployed major version by default.
+const postgresMajor=process.env.TEST_POSTGRES_MAJOR??'17';
+if(!['15','17'].includes(postgresMajor))throw new Error('Unsupported test PostgreSQL major');
 function docker(args, quiet = false) {
   const result = spawnSync('docker', args, { cwd: root, encoding: 'utf8', timeout: 180000 });
   if (result.status !== 0) throw new Error(`docker ${args[0]} failed: ${result.stderr || result.error || result.stdout}`);
@@ -49,7 +53,7 @@ writeFileSync(resolve(temp, 'run.sql'), '\\set ON_ERROR_STOP on\n' + platform + 
   + '\n' + fixtures + '\n\\i /tests/security_rls.sql\n\\i /tests/storage_readiness.sql\n\\i /tests/audit_safety.sql\n\\i /tests/payment_fulfillment.sql\n\\i /tests/pinned_attempts.sql\n');
 let created = false;
 try {
-  docker(['run', '-d', '--name', container, '--label', `${ownerLabel}=${runId}`, '--network', 'none', '--memory', '512m', '--cpus', '1', '-e', 'POSTGRES_PASSWORD=isolated-fixture-only', '-e', 'POSTGRES_DB=app_test', 'postgres:15-alpine'], true);
+  docker(['run', '-d', '--name', container, '--label', `${ownerLabel}=${runId}`, '--network', 'none', '--memory', '512m', '--cpus', '1', '-e', 'POSTGRES_PASSWORD=isolated-fixture-only', '-e', 'POSTGRES_DB=app_test', `postgres:${postgresMajor}-alpine`], true);
   created = true;
   let ready = false;
   for (let i = 0; i < 30; i++) {
