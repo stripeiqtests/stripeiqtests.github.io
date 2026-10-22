@@ -18,6 +18,14 @@ another project to make a command pass.
 3. Matching frontend: sends locale, displays actual email queue state and reads
    result metadata through the capability-protected context endpoint.
 
+For the dashboard's single-file editor, `pnpm bundle:edge` bundles local shared
+modules into four readable candidates under `node_modules/.tmp/edge-bundles/`.
+`manifest.json` records the exact target, file hashes and JWT setting; it does not
+deploy anything or contain secret values. The external Stripe npm import stays
+version-pinned. Prefer normal multifile CLI/MCP deployment once the correct
+account is connected; if using the editor, compare the entire pasted file with
+the candidate before deploying. Retain the preceding deployed source for recovery.
+
 No existing results/questions are deleted. Existing Checkout sessions created by
 the prior server remain supported through their Stripe-stored `expectedAmount`
 metadata; current editable test prices are not used to reject those payments.

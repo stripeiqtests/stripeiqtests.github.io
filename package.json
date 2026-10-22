@@ -17,6 +17,7 @@
     "test:database": "node scripts/test-database.mjs",
     "test:edge": "deno test --config supabase/functions/deno.json --allow-env supabase/functions/tests",
     "test:hosting": "node --test scripts/hosting.test.mjs",
+    "bundle:edge": "node scripts/bundle-edge.mjs",
     "verify:production-target": "node scripts/assert-production-target.mjs",
     "preview": "vite preview"
   },
