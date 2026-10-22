@@ -304,7 +304,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
                     .eq('key', 'language_mode')
                     .single();
 
-                const mode = (data?.value as LanguageMode) || 'ru';
+                const value = data?.value;
+                const mode: LanguageMode = value === 'ru' || value === 'en' || value === 'bilingual' ? value : 'ru';
                 setLanguageModeState(mode);
 
                 // Set language based on mode
@@ -333,37 +334,30 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         // Only allow switching in bilingual mode
         if (languageMode === 'bilingual') {
             setLangState(newLang);
-            localStorage.setItem('lang', newLang);
+            try { localStorage.setItem('lang', newLang); } catch { /* Optional preference. */ }
         }
     };
 
     const setLanguageMode = async (mode: LanguageMode) => {
         try {
-            // Update in database
-            const { error: updateError } = await supabase
-                .from('app_settings')
-                .update({ value: mode })
-                .eq('key', 'language_mode');
-
-            if (updateError) {
-                // Try insert if update fails
-                await supabase
-                    .from('app_settings')
-                    .insert({ key: 'language_mode', value: mode });
-            }
+            const { error } = await supabase.from('app_settings')
+                .upsert({ key: 'language_mode', value: mode }, { onConflict: 'key' });
+            if (error) throw error;
 
             setLanguageModeState(mode);
 
             // Update current language based on new mode
             if (mode !== 'bilingual') {
                 setLangState(mode);
-                localStorage.setItem('lang', mode);
+                try { localStorage.setItem('lang', mode); } catch { /* Optional preference. */ }
             }
         } catch (error) {
             console.error('Error saving language mode:', error);
             throw error;
         }
     };
+
+    useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
     const t = (key: string): string => {
         return translations[lang][key as keyof typeof translations['ru']] || key;

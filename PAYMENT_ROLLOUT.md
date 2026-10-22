@@ -1,0 +1,70 @@
+# Payment fulfillment rollout
+
+This is a reviewable release procedure, not evidence that deployment happened.
+Target: `afsoyuczexiztsjntkvi` only. The globally authenticated Supabase CLI account
+currently does not list this project; do not deploy with that account or switch to
+another project to make a command pass.
+
+## Package
+
+1. `20261022200000_payment_fulfillment.sql`: private immutable checkout orders,
+   atomic entitlement + email enqueue, leased retry outbox, capability-protected
+   result context (also works after test archival).
+2. Updated `create-checkout`, `verify-payment`, `send-results-email` and new
+   `stripe-webhook`, with shared modules and the committed Deno dependency lock.
+3. Matching frontend: sends locale, displays actual email queue state and reads
+   result metadata through the capability-protected context endpoint.
+
+No existing results/questions are deleted. Existing Checkout sessions created by
+the prior server remain supported through their Stripe-stored `expectedAmount`
+metadata; current editable test prices are not used to reject those payments.
+
+## Required configuration
+
+- Retain existing `STRIPE_SECRET_KEY`, database service key, `RESEND_API_KEY`.
+- Set `STRIPE_WEBHOOK_SECRET` for this exact endpoint/account/mode.
+- Set a separately generated `RESULT_EMAIL_WORKER_SECRET`, used only to drain the
+  mail queue. It does not authorize arbitrary emails, SQL, result reads or payments.
+- Create the Stripe endpoint at
+  `https://afsoyuczexiztsjntkvi.supabase.co/functions/v1/stripe-webhook`, subscribed
+  to `checkout.session.completed` and `checkout.session.async_payment_succeeded`.
+- Run the private email worker every few minutes, POST `{}` with its Bearer secret.
+  Store it in a root-readable environment file, not the public healthcheck/repository.
+  The monitor/notification destination is not chosen yet; do not send messages.
+- Never paste real secret values into chat, source, shell history or screenshots.
+  Credential entry/creation in the browser is a user handoff when required.
+
+## Release order and acceptance
+
+1. Run lint/build/browser/Edge/real PostgreSQL gates. Review SQL grants and diffs.
+2. With explicit approval, apply this new migration once; do not replay historical
+   migrations against the manually managed production database.
+3. Deploy shared modules and all matching functions to the verified target.
+4. Configure webhook and private retry worker. Use a test-mode isolated environment
+   to exercise success, promo discount, 100% promo, price change after checkout,
+   closed return tab, duplicate webhook, expired checkout, and temporary mail error.
+   Real financial transactions must be completed by the user when required.
+5. Release frontend and verify a paid capability can retrieve its archived test
+   metadata; an unpaid capability cannot read scores; wrong capability returns none.
+6. Verify Stripe delivery succeeds, no duplicate entitlement/mail jobs, pending mail
+   transitions to sent or a visible failure, and the personalized email link opens
+   results in a fresh browser session. Verify provider acceptance separately from
+   actual inbox delivery; the UI does not promise delivery.
+
+## Failure behavior and recovery
+
+- Database failure: webhook returns 503 for Stripe retry; no premature 200 success.
+- Email failure: paid access remains unlocked; persistent pending job retries.
+- Worker crash: lease expires in 2 minutes. Provider requests use one frozen body
+  and an idempotency key per job. Resend keys last 24h; automatic retries stop at
+  8 attempts or before 23h. Old ambiguous sends require operator review.
+- Do not claim exactly-once email delivery beyond the provider's idempotency window.
+- Do not roll back the live score-masking patch. If payment release fails, retain
+  private order/outbox records for reconciliation; do not drop paid state/tables.
+- Reverting to the former verification code reintroduces discount/price-change
+  failures. Prefer fixing the new shared fulfillment path and replaying failed
+  signed Stripe deliveries after recovery.
+
+Official references: [Stripe fulfillment](https://docs.stripe.com/checkout/fulfillment),
+[Stripe webhook verification](https://docs.stripe.com/events/manage-webhook-endpoints),
+[Resend idempotency window](https://resend.com/docs/dashboard/emails/idempotency-keys).

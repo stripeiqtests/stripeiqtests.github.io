@@ -9,7 +9,9 @@ import { EditableField } from '../components/EditableField';
 import { trackBeginCheckout } from '../lib/analytics';
 import { useContent } from '../lib/useContent';
 import { RichInlineText, RichTextContent } from '../components/RichTextContent';
-import { readSessionAccess } from '../lib/sessionAccess';
+import { readSessionAccess, resultPath } from '../lib/sessionAccess';
+import { SupportLink } from '../components/SupportLink';
+import { getScoreInterpretation, getProfileDescription } from '../lib/resultSummary';
 
 export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -79,6 +81,10 @@ export function Results() {
   const [archetypeResult, setArchetypeResult] = useState<ArchetypeResult | null>(null);
   const [followUpTestSlug, setFollowUpTestSlug] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [accessError, setAccessError] = useState<'missing-token' | 'network' | 'missing' | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [showPersonalLink, setShowPersonalLink] = useState(false);
+  const [paymentError, setPaymentError] = useState(false);
 
   useEffect(() => {
     loadFollowUpTestSlug();
@@ -111,6 +117,10 @@ export function Results() {
       { dimension: 'intuitive', score: sess.intuitive_score || 0 },
     ];
     const strongest = scores.reduce((max, s) => s.score > max.score ? s : max);
+    if (!sess.is_paid || strongest.score <= 0 || scores.filter(s => s.score === strongest.score).length > 1) {
+      setArchetypeResult(null);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('archetype_results')
@@ -126,8 +136,10 @@ export function Results() {
 
   async function loadSession() {
     if (!sessionId) return;
+    setLoading(true); setAccessError(null);
     const token = readSessionAccess(sessionId);
     if (!token) {
+      setAccessError('missing-token');
       setLoading(false);
       return;
     }
@@ -143,17 +155,22 @@ export function Results() {
     const sessionData = rawSessionData as TestSession | null;
 
     if (sessionError || !sessionData) {
+      setAccessError(sessionError?.code === 'PGRST116' || !sessionError ? 'missing' : 'network');
       setLoading(false);
       return;
     }
 
-    setSession(sessionData);
+    const {data:context} = await supabase.rpc('get_result_context', {
+      p_session_id:sessionId,p_access_token:token,
+    }).maybeSingle<{test:Test;email_status:TestSession['email_status']}>();
+    const deliveryStatus = context?.email_status;
+    setSession({...sessionData,email_status:typeof deliveryStatus==='string' && ['pending','sending','sent','failed'].includes(deliveryStatus) ? deliveryStatus : null});
 
     // Load archetype result based on scores
     loadArchetypeResult(sessionData);
 
     // Load test info
-    const { data: testData } = await supabase
+    const { data: testData } = context?.test ? {data:context.test as Test} : await supabase
       .from('tests')
       .select('*')
       .eq('id', sessionData.test_id)
@@ -167,9 +184,10 @@ export function Results() {
   }
 
   async function handlePayment() {
-    if (!session || !test || !accessToken) return;
+    if (!session || !test || !accessToken || processingPayment) return;
 
     setProcessingPayment(true);
+    setPaymentError(false);
 
     // Track checkout initiation
     trackBeginCheckout(test.id, test.price_cents);
@@ -180,18 +198,20 @@ export function Results() {
         body: {
           sessionId: session.id,
           accessToken,
+          language:lang,
         },
       });
 
       if (error) throw error;
 
       // Redirect to Stripe checkout
-      if (data?.url) {
-        window.location.href = data.url;
-      }
+      if (!data?.url) throw new Error('Checkout URL is missing');
+      const checkoutUrl = new URL(data.url);
+      if (checkoutUrl.protocol !== 'https:' || checkoutUrl.hostname !== 'checkout.stripe.com') throw new Error('Invalid checkout URL');
+      window.location.href = checkoutUrl.href;
     } catch (err) {
-      console.error('Payment error:', err);
-      alert(lang === 'ru' ? 'Ошибка оплаты. Попробуйте еще раз.' : 'Failed to initiate payment. Please try again.');
+      void err;
+      setPaymentError(true);
       setProcessingPayment(false);
     }
   }
@@ -207,17 +227,19 @@ export function Results() {
     );
   }
 
-  if (!session) {
+  if (!session || accessError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
           <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {lang === 'ru' ? 'Сессия не найдена' : 'Session Not Found'}
+            {accessError === 'missing-token' ? (lang === 'ru' ? 'Нужна персональная ссылка' : 'Your personal link is needed') : accessError === 'network' ? (lang === 'ru' ? 'Не удалось загрузить результат' : 'Could not load your result') : (lang === 'ru' ? 'Сессия не найдена' : 'Session not found')}
           </h1>
           <p className="text-gray-500 mb-6">
-            {lang === 'ru' ? 'Эта тестовая сессия не существует или истекла.' : "This test session doesn't exist or has expired."}
+            {accessError === 'missing-token' ? (lang === 'ru' ? 'В этой вкладке нет ключа доступа. Откройте сохранённую персональную ссылку. Если результат уже оплачен, обратитесь в поддержку — платить заново не нужно.' : 'This tab has no access key. Open your saved personal link. If you already paid, contact support; you do not need to pay again.') : (lang === 'ru' ? 'Проверьте подключение и исходную персональную ссылку. Сохранённые данные не удалены.' : 'Check your connection and original personal link. Saved data has not been deleted.')}
           </p>
+          {accessError === 'network' && <button className="mb-4 rounded-lg border border-indigo-600 px-4 py-2 text-indigo-700" onClick={() => void loadSession()}>{lang === 'ru' ? 'Повторить' : 'Retry'}</button>}
+          <p className="mb-5"><SupportLink /></p>
           <Link
             to="/"
             className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700"
@@ -234,6 +256,7 @@ export function Results() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+          {paymentError && <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-red-800"><p>{lang === 'ru' ? 'Не удалось открыть оплату. Попробуйте ещё раз.' : 'Could not open checkout. Please retry.'}</p><SupportLink /></div>}
           {/* Language Switcher */}
           <div className="flex justify-end mb-4">
             <LanguageSwitcher />
@@ -433,7 +456,10 @@ export function Results() {
   const resultsTitle = lang === 'ru' ? 'Результаты IQ теста' : 'Your IQ Test Results';
   const overallScoreLabel = lang === 'ru' ? 'ОБЩИЙ БАЛЛ' : 'OVERALL SCORE';
   const profileHeading = lang === 'ru' ? 'Ваш когнитивный профиль' : 'Your Cognitive Profile';
-  const emailSentText = lang === 'ru' ? 'Копия результатов отправлена на' : 'A copy of these results has been sent to';
+  const emailSentText = session.email_status === 'sent' ? (lang === 'ru' ? 'Копия передана почтовому сервису для отправки на' : 'A copy was accepted by the email service for')
+    : session.email_status === 'failed' ? (lang === 'ru' ? 'Не удалось отправить письмо. Контакт для копии:' : 'The email could not be sent. Address for your copy:')
+      : session.email_status === 'pending' || session.email_status === 'sending' ? (lang === 'ru' ? 'Копия результата ожидает отправки на' : 'Your result copy is queued for')
+      : (lang === 'ru' ? 'Email для копии результата:' : 'Email for your result copy:');
   const takeAnotherText = lang === 'ru' ? 'Пройти другой тест' : 'Take Another Test';
 
   // Dimension labels
@@ -449,6 +475,16 @@ export function Results() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
+        {session.is_paid && accessToken && <section className="mb-6 rounded-xl border border-indigo-200 bg-white p-4 print:hidden">
+          <p className="mb-3 text-sm text-gray-700">{lang === 'ru' ? 'Сохраните персональную ссылку, чтобы вернуться к результату. Ссылка даёт доступ к вашему результату — храните её для себя.' : 'Save your personal link to return to this result. Anyone with this link can open your result; keep it private.'}</p>
+          <button className="rounded-lg bg-indigo-600 px-4 py-2 text-white" onClick={async () => {
+            const link = new URL(resultPath(session.id, accessToken), window.location.origin).href;
+            try { await navigator.clipboard.writeText(link); setLinkCopied(true); }
+            catch { setShowPersonalLink(true); }
+          }}>{linkCopied ? (lang === 'ru' ? 'Ссылка скопирована' : 'Link copied') : (lang === 'ru' ? 'Сохранить персональную ссылку' : 'Save personal link')}</button>
+          {showPersonalLink && <label className="mt-3 block text-sm">{lang === 'ru' ? 'Скопируйте ссылку:' : 'Copy this link:'}<input readOnly onFocus={event => event.currentTarget.select()} value={new URL(resultPath(session.id, accessToken), window.location.origin).href} className="mt-1 w-full rounded border p-2" /></label>}
+          <p className="mt-3 text-sm"><SupportLink /></p>
+        </section>}
         {/* Language Switcher */}
         <div className="flex justify-end mb-4">
           <LanguageSwitcher />
@@ -501,7 +537,7 @@ export function Results() {
                 className="font-semibold text-gray-900"
               />
             ) : getContent(`results_analyst_title${langKey}`, analystTitle)}
-            score={session.analyst_score || 0}
+            score={session.analyst_score}
             color="blue"
             description={isAdmin && isPreview ? (
               <EditableField
@@ -521,7 +557,7 @@ export function Results() {
                 className="font-semibold text-gray-900"
               />
             ) : getContent(`results_strategist_title${langKey}`, strategistTitle)}
-            score={session.strategist_score || 0}
+            score={session.strategist_score}
             color="purple"
             description={isAdmin && isPreview ? (
               <EditableField
@@ -541,7 +577,7 @@ export function Results() {
                 className="font-semibold text-gray-900"
               />
             ) : getContent(`results_observer_title${langKey}`, observerTitle)}
-            score={session.observer_score || 0}
+            score={session.observer_score}
             color="green"
             description={isAdmin && isPreview ? (
               <EditableField
@@ -561,7 +597,7 @@ export function Results() {
                 className="font-semibold text-gray-900"
               />
             ) : getContent(`results_intuitive_title${langKey}`, intuitiveTitle)}
-            score={session.intuitive_score || 0}
+            score={session.intuitive_score}
             color="yellow"
             description={isAdmin && isPreview ? (
               <EditableField
@@ -602,9 +638,9 @@ export function Results() {
 
         {/* Email confirmation */}
         {session.email && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center gap-3">
-            <Mail className="w-5 h-5 text-green-600" />
-            <div className="text-sm text-green-700">
+          <div role={session.email_status === 'failed' ? 'alert' : 'status'} className={`border rounded-xl p-4 mb-6 flex items-center gap-3 ${session.email_status === 'failed' ? 'bg-red-50 border-red-200 text-red-800' : session.email_status === 'sent' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-slate-50 border-slate-200 text-slate-800'}`}>
+            <Mail className="w-5 h-5 shrink-0" />
+            <div className="text-sm">
               {isAdmin && isPreview ? (
                 <EditableField
                   value={getContent(`results_email_sent${langKey}`, emailSentText)}
@@ -613,7 +649,7 @@ export function Results() {
                   className="text-sm text-green-700"
                 />
               ) : (
-                getContent(`results_email_sent${langKey}`, emailSentText)
+                session.email_status === 'sent' ? getContent(`results_email_sent${langKey}`, emailSentText) : emailSentText
               )}{' '}
               <strong>{session.email}</strong>
             </div>
@@ -650,7 +686,7 @@ function DimensionCard({
   description
 }: {
   title: React.ReactNode;
-  score: number;
+  score: number | null;
   color: 'blue' | 'purple' | 'green' | 'yellow';
   description: React.ReactNode;
 }) {
@@ -665,7 +701,7 @@ function DimensionCard({
     blue: 'text-blue-600',
     purple: 'text-purple-600',
     green: 'text-green-600',
-    yellow: 'text-yellow-600',
+    yellow: 'text-yellow-800',
   };
 
   return (
@@ -673,7 +709,7 @@ function DimensionCard({
       <div className="flex justify-between items-start mb-2">
         <h4 className="font-semibold text-gray-900">{title}</h4>
         <span className={`text-2xl font-bold ${textClasses[color]}`}>
-          {Math.round(score)}%
+          {score === null ? '—' : `${Math.round(score)}%`}
         </span>
       </div>
       <div className="text-sm text-gray-600">{description}</div>
@@ -682,59 +718,13 @@ function DimensionCard({
           className={`h-full rounded-full transition-all duration-500 ${color === 'blue' ? 'bg-blue-500' :
             color === 'purple' ? 'bg-purple-500' :
               color === 'green' ? 'bg-green-500' :
-                'bg-yellow-500'
+                  'bg-yellow-700'
             }`}
-          style={{ width: `${score}%` }}
+          style={{ width: `${score ?? 0}%` }}
         />
       </div>
     </div>
   );
-}
-
-function getScoreInterpretation(score: number, lang: string): string {
-  if (lang === 'ru') {
-    if (score >= 80) return 'Отлично! Ваши когнитивные способности высокоразвиты.';
-    if (score >= 60) return 'Хороший результат! Ваши способности выше среднего.';
-    if (score >= 40) return 'Средний результат. Есть потенциал для развития.';
-    return 'Есть возможности для улучшения в этой области.';
-  }
-  if (score >= 80) return 'Excellent! Your cognitive abilities are highly developed.';
-  if (score >= 60) return 'Good result! Your abilities are above average.';
-  if (score >= 40) return 'Average result. There is potential for development.';
-  return 'There are opportunities for improvement in this area.';
-}
-
-function getProfileDescription(session: TestSession, lang: string): string {
-  const scores = [
-    { name: lang === 'ru' ? 'Аналитик' : 'Analyst', key: 'analyst', score: session.analyst_score || 0 },
-    { name: lang === 'ru' ? 'Стратег' : 'Strategist', key: 'strategist', score: session.strategist_score || 0 },
-    { name: lang === 'ru' ? 'Наблюдатель' : 'Observer', key: 'observer', score: session.observer_score || 0 },
-    { name: lang === 'ru' ? 'Интуит' : 'Intuitive', key: 'intuitive', score: session.intuitive_score || 0 },
-  ];
-
-  const strongest = scores.reduce((max, s) => s.score > max.score ? s : max);
-
-  const descriptions: Record<string, { ru: string; en: string }> = {
-    'analyst': {
-      ru: 'Вы превосходно справляетесь с логическими задачами и анализом данных. Карьера в аналитике, программировании, науке и финансах вам подходит.',
-      en: 'You excel at logical tasks and data analysis. Your approach to problem-solving is based on facts and rational thinking. Careers in analytics, programming, science, and finance suit you well.',
-    },
-    'strategist': {
-      ru: 'Вы умеете планировать наперёд и видеть общую картину. Лидерство, управление проектами и бизнес-планирование — ваши сильные стороны.',
-      en: 'You are skilled at planning ahead and seeing the big picture. Leadership positions, project management, and business planning are your strengths.',
-    },
-    'observer': {
-      ru: 'У вас отличное пространственное мышление и внимание к деталям. Карьера в дизайне, архитектуре, инженерии и искусстве вам подходит.',
-      en: 'You have excellent spatial thinking and attention to detail. Careers in design, architecture, engineering, and art suit you.',
-    },
-    'intuitive': {
-      ru: 'Ваше творческое мышление позволяет находить нестандартные решения. Творческие профессии, инновации и предпринимательство — ваше призвание.',
-      en: 'Your creative and associative thinking allows you to find unconventional solutions. Creative professions, innovation, and entrepreneurship are your calling.',
-    },
-  };
-
-  const prefix = lang === 'ru' ? `Ваша сильнейшая сторона — ${strongest.name}. ` : `Your strongest dimension is ${strongest.name}. `;
-  return prefix + descriptions[strongest.key][lang as 'ru' | 'en'];
 }
 
 // Archetype Result Section Component

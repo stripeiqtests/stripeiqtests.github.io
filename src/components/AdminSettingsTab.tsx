@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { Test } from '../lib/supabase';
 import { Save, Check, Globe } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
+import { useSiteSettings, supportHref } from '../lib/siteSettings';
 
 interface AdminSettingsTabProps {
     tests: Test[];
@@ -12,6 +13,11 @@ type LanguageMode = 'ru' | 'en' | 'bilingual';
 
 export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
     const { lang, languageMode, setLanguageMode } = useLanguage();
+    const { supportContact, saveSupportContact } = useSiteSettings();
+    const [contactDraft, setContactDraft] = useState<string | null>(null);
+    const [savingContact, setSavingContact] = useState(false);
+    const [contactSaved, setContactSaved] = useState(false);
+    const [saveError, setSaveError] = useState('');
     const [followUpTestSlug, setFollowUpTestSlug] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -20,45 +26,33 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
     const [languageModeSaved, setLanguageModeSaved] = useState(false);
 
     useEffect(() => {
-        // The request resolves before it updates local UI state.
-        // eslint-disable-next-line react-hooks/immutability
-        loadSettings();
-    }, []);
-
-    async function loadSettings() {
-        setLoading(true);
-        const { data } = await supabase
+        let cancelled=false;
+        void supabase
             .from('app_settings')
             .select('value')
             .eq('key', 'follow_up_test_slug')
-            .single();
-
-        if (data) {
-            setFollowUpTestSlug(data.value || '');
-        }
-        setLoading(false);
-    }
+            .maybeSingle().then(({data,error})=>{
+                if(cancelled)return;
+                if(error)setSaveError(lang==='ru'?'Не удалось загрузить настройки. Обновите страницу.':'Could not load settings. Please reload.');
+                if(data)setFollowUpTestSlug(data.value||'');
+                setLoading(false);
+            });
+        return ()=>{cancelled=true;};
+    }, [lang]);
 
     async function saveFollowUpTestSlug() {
         setSaving(true);
         setSaved(false);
 
-        // Try to update first
-        const { error: updateError } = await supabase
-            .from('app_settings')
-            .update({ value: followUpTestSlug, updated_at: new Date().toISOString() })
-            .eq('key', 'follow_up_test_slug');
-
-        if (updateError) {
-            // If update fails, try insert
-            await supabase
-                .from('app_settings')
-                .insert({ key: 'follow_up_test_slug', value: followUpTestSlug });
-        }
-
-        setSaving(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        setSaveError('');
+        try {
+            const { error } = await supabase.from('app_settings')
+                .upsert({ key: 'follow_up_test_slug', value: followUpTestSlug, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+            if (error) throw error;
+            setSaved(true);
+            setTimeout(() => setSaved(false), 2000);
+        } catch { setSaveError(lang === 'ru' ? 'Не удалось сохранить настройку. Попробуйте ещё раз.' : 'Could not save this setting. Please retry.'); }
+        finally { setSaving(false); }
     }
 
     async function handleLanguageModeChange(mode: LanguageMode) {
@@ -70,6 +64,7 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
             setTimeout(() => setLanguageModeSaved(false), 2000);
         } catch (error) {
             console.error('Error saving language mode:', error);
+            setSaveError(lang === 'ru' ? 'Не удалось сохранить язык. Попробуйте ещё раз.' : 'Could not save the language. Please retry.');
         }
         setSavingLanguageMode(false);
     }
@@ -84,6 +79,20 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
 
     return (
         <div className="space-y-6">
+            {saveError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{saveError}</p>}
+            <form className="rounded-xl border bg-white p-6" onSubmit={async event => {
+                event.preventDefault(); if (savingContact) return;
+                setSavingContact(true); setContactSaved(false); setSaveError('');
+                try { await saveSupportContact(contactDraft ?? supportContact); setContactDraft(null); setContactSaved(true); }
+                catch { setSaveError(lang === 'ru' ? 'Не удалось сохранить контакт поддержки.' : 'Could not save the support contact.'); }
+                finally { setSavingContact(false); }
+            }}>
+                <label htmlFor="support-contact" className="mb-2 block font-semibold">{lang === 'ru' ? 'Публичный контакт поддержки' : 'Public support contact'}</label>
+                <p className="mb-3 text-sm text-gray-700">{lang === 'ru' ? 'Email или HTTPS-ссылка. Контакт показывается на сайте и при проблемах с оплатой.' : 'Email or HTTPS link, shown on the website and payment error screens.'}</p>
+                <input id="support-contact" type="text" value={contactDraft ?? supportContact} onChange={e => { setContactDraft(e.target.value); setContactSaved(false); }} disabled={savingContact} className="w-full rounded-lg border px-3 py-2" required />
+                <button type="submit" disabled={savingContact || !supportHref(contactDraft ?? supportContact)} className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-white disabled:opacity-50">{savingContact ? (lang === 'ru' ? 'Сохранение…' : 'Saving…') : (lang === 'ru' ? 'Сохранить контакт' : 'Save contact')}</button>
+                {contactSaved && <span role="status" className="ml-3 text-green-800">{lang === 'ru' ? 'Сохранено' : 'Saved'}</span>}
+            </form>
             <h2 className="text-xl font-bold text-gray-900">
                 {lang === 'ru' ? 'Настройки' : 'Settings'}
             </h2>

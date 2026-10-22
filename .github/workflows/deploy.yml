@@ -44,6 +44,23 @@ jobs:
       - name: Rich-text regression checks
         run: pnpm test:rich-text
 
+      - name: Database contracts in isolated PostgreSQL
+        run: pnpm test:database
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+
+      - name: Payment and webhook contracts
+        run: pnpm test:edge
+
+      - name: Install browser for regression checks
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Browser regression checks
+        run: pnpm test:browser
+
       - name: Build
         run: pnpm run build
 

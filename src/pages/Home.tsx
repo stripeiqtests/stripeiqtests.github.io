@@ -7,6 +7,8 @@ import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
 import { useContent } from '../lib/useContent';
+import { SupportLink } from '../components/SupportLink';
+import { openConsentSettings } from '../lib/consent';
 
 export function Home() {
   const [tests, setTests] = useState<Test[]>([]);
@@ -117,7 +119,7 @@ export function Home() {
       </header>
 
       {/* Hero Section */}
-      <section className="max-w-6xl mx-auto px-4 py-16 text-center">
+      <section className="max-w-6xl mx-auto px-4 py-8 md:py-16 text-center">
         <EditableField
           value={heroTitle}
           onSave={(value) => saveContent(lang === 'ru' ? 'hero_title_ru' : 'hero_title_en', value)}
@@ -133,6 +135,12 @@ export function Home() {
             multiline
           />
         </div>
+
+        {!loading && tests.length > 0 && <div className="mb-10">
+          {tests.length === 1 ? <Link data-testid="hero-start" to={`/${tests[0].slug}`} className="inline-flex rounded-xl bg-indigo-600 px-8 py-3 font-semibold text-white hover:bg-indigo-700">{t('home.start_test')}</Link>
+            : <a href="#available-tests" className="inline-flex rounded-xl bg-indigo-600 px-8 py-3 font-semibold text-white hover:bg-indigo-700">{lang === 'ru' ? 'Выбрать тест' : 'Choose a test'}</a>}
+          <p className="mt-3 text-sm text-gray-700">{lang === 'ru' ? 'Пройти тест бесплатно. ' : 'Take the test for free. '}{tests.length === 1 ? (lang === 'ru' ? `Полный результат — $${(tests[0].price_cents / 100).toFixed(2)}.` : `Full results — $${(tests[0].price_cents / 100).toFixed(2)}.`) : (lang === 'ru' ? 'Цена полного результата указана у каждого теста.' : 'Full result prices are shown with each test.')}</p>
+        </div>}
 
         {/* Features */}
         <div className="grid md:grid-cols-4 gap-6 mb-16">
@@ -333,7 +341,7 @@ export function Home() {
       </section>
 
       {/* Available Tests */}
-      <section className="max-w-4xl mx-auto px-4 pb-16">
+      <section id="available-tests" className="max-w-4xl mx-auto px-4 pb-16 scroll-mt-24">
         <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">
           {t('home.available_tests')}
         </h2>
@@ -366,8 +374,8 @@ export function Home() {
                     <Edit2 className="w-4 h-4" />
                   </Link>
                 )}
-                <div className="flex justify-between items-start">
-                  <div>
+                <div className="flex flex-col gap-5 sm:flex-row sm:justify-between sm:items-start">
+                  <div className="min-w-0 flex-1">
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">{test.title}</h3>
                     <p className="text-gray-600 mb-4">{test.description}</p>
                     <p className="text-sm text-gray-500">
@@ -378,7 +386,7 @@ export function Home() {
                   </div>
                   <Link
                     to={`/${test.slug}`}
-                    className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                    className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors whitespace-nowrap text-center sm:shrink-0"
                   >
                     {t('home.start_test')}
                   </Link>
@@ -400,14 +408,15 @@ export function Home() {
             multiline
           />
           <div className="mt-4 flex justify-center gap-4 text-sm">
-            <a href="/privacy" className="text-gray-400 hover:text-indigo-600 transition-colors">
+            <a href="/privacy" className="text-gray-600 underline hover:text-indigo-700 transition-colors">
               {lang === 'ru' ? 'Политика конфиденциальности' : 'Privacy Policy'}
             </a>
             <span className="text-gray-300">|</span>
-            <a href="/terms" className="text-gray-400 hover:text-indigo-600 transition-colors">
+            <a href="/terms" className="text-gray-600 underline hover:text-indigo-700 transition-colors">
               {lang === 'ru' ? 'Условия использования' : 'Terms of Use'}
             </a>
           </div>
+          <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm"><SupportLink /><button className="text-indigo-700 underline" onClick={openConsentSettings}>{lang === 'ru' ? 'Настройки cookies' : 'Cookie settings'}</button></div>
         </div>
       </footer>
     </div>

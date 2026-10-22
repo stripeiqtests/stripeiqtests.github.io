@@ -14,6 +14,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Types for our database
 export interface Test {
+  archived_at?: string | null;
   id: string;
   slug: string;
   title: string;
@@ -38,6 +39,7 @@ export interface Question {
 export type PublicQuestion = Omit<Question, 'correct_answer'>;
 
 export interface TestSession {
+  email_status?: 'pending' | 'sending' | 'sent' | 'failed' | null;
   id: string;
   test_id: string;
   email: string | null;

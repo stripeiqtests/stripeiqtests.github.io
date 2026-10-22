@@ -1,6 +1,7 @@
 /**
  * Analytics utility for Google Analytics 4 and Meta Pixel
  */
+import { readConsent } from './consent';
 
 // Type declarations for global analytics functions
 declare global {
@@ -15,6 +16,37 @@ declare global {
 export const GA_MEASUREMENT_ID = 'G-BNN1N9N1PT';
 export const META_PIXEL_ID = 'XXXXXXXXXXXXXXXXX';
 
+export function initializeAnalytics() {
+    if (readConsent() !== 'granted' || document.getElementById('optional-ga')) return;
+    (window as unknown as Record<string, unknown>)[`ga-disable-${GA_MEASUREMENT_ID}`] = false;
+    window.dataLayer ??= [];
+    window.gtag ??= (...args: unknown[]) => { window.dataLayer.push(args); };
+    window.gtag('js', new Date());
+    window.gtag('config', GA_MEASUREMENT_ID, {
+        send_page_view: false,
+        page_location: `${window.location.origin}/`,
+        page_referrer: '',
+        allow_google_signals: false,
+        allow_ad_personalization_signals: false,
+    });
+    const script = document.createElement('script');
+    script.id = 'optional-ga'; script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+    document.head.append(script);
+}
+
+export function disableAnalytics() {
+    (window as unknown as Record<string, unknown>)[`ga-disable-${GA_MEASUREMENT_ID}`] = true;
+    document.getElementById('optional-ga')?.remove();
+    for (const cookie of document.cookie.split(';')) {
+        const name = cookie.trim().split('=')[0];
+        if (!/^_ga(?:_|$)/.test(name)) continue;
+        for (const domain of ['', `;domain=${location.hostname}`, `;domain=.${location.hostname}`]) {
+            document.cookie = `${name}=;max-age=0;path=/${domain};SameSite=Lax`;
+        }
+    }
+}
+
 /**
  * Track an event to both GA4 and Meta Pixel
  */
@@ -27,6 +59,7 @@ export function trackEvent(
         metaEventName?: string; // Custom Meta event name if different from GA
     }
 ) {
+    if (readConsent() !== 'granted') return;
     const { gaOnly, metaOnly, metaEventName } = options || {};
 
     // GA4 tracking
@@ -100,19 +133,26 @@ export function trackBeginCheckout(testId: string, priceInCents: number, currenc
 /**
  * Track successful purchase
  */
-export function trackPurchase(
+export async function trackPurchase(
     testId: string,
     priceInCents: number,
-    currency: string = 'USD'
+    currency: string = 'USD',
+    checkoutId: string
 ) {
+    if (readConsent() !== 'granted' || !checkoutId) return;
+    // Stripe checkout IDs authorize verification: send only a one-way digest.
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(checkoutId));
+    const transactionId = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    try { if (sessionStorage.getItem(`purchase:${transactionId}`)) return; } catch { /* GA also deduplicates by ID. */ }
     trackEvent('purchase', {
-        transaction_id: crypto.randomUUID(),
+        transaction_id: transactionId,
         test_id: testId,
         value: priceInCents / 100,
         currency,
     }, {
         metaEventName: 'Purchase'
     });
+    try { sessionStorage.setItem(`purchase:${transactionId}`, 'sent'); } catch { /* Optional deduplication. */ }
 }
 
 /**

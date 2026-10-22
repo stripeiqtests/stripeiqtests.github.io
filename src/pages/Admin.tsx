@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { generateSlug } from '../lib/utils';
 import type { Test, Question } from '../lib/supabase';
@@ -13,10 +13,15 @@ import { AdminPagesDashboard } from '../components/AdminPagesDashboard';
 import { AdminArchetypesTab } from '../components/AdminArchetypesTab';
 import { AdminSettingsTab } from '../components/AdminSettingsTab';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
+import { parseOptions, validPrice, nextQuestionNumber } from '../lib/testData';
 
 export function Admin() {
   const { isAdmin, authLoading, login, logout } = useAdmin();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const [actionError, setActionError] = useState('');
+  const [pendingAction, setPendingAction] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const actionLock = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -71,14 +76,15 @@ export function Admin() {
       .select('*')
       .order('created_at', { ascending: false });
 
+    if (error) setActionError(lang === 'ru' ? 'Не удалось загрузить тесты. Обновите страницу.' : 'Could not load tests. Please reload.');
     if (!error && data) {
       setTests(data);
     }
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     if (isAdmin) {
-      // Data is loaded asynchronously; the state update occurs after the request.
+      // All state updates inside this callback follow the awaited HTTP response.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void loadTests();
     }
@@ -141,38 +147,52 @@ export function Admin() {
 
   useEffect(() => {
     if (isAdmin && activeTab === 'tests' && expandedTestId && !questions[expandedTestId]) {
-      // The request updates questions asynchronously after the response.
+      // All state updates inside this callback follow the awaited HTTP response.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void loadQuestions(expandedTestId);
     }
   }, [isAdmin, activeTab, expandedTestId, questions, loadQuestions]);
 
   async function toggleTestActive(test: Test) {
+    if (test.archived_at) return;
+    await runAction(async () => {
     const { error } = await supabase
       .from('tests')
       .update({ is_active: !test.is_active })
       .eq('id', test.id);
 
-    if (!error) {
-      loadTests();
-    }
+    if (error) throw error;
+    await loadTests();
+    });
+  }
+
+  async function runAction(action: () => Promise<void>) {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setPendingAction(true); setActionError('');
+    try { await action(); }
+    catch (error) { setActionError(saveErrorMessage(error, lang)); }
+    finally { actionLock.current = false; setPendingAction(false); }
   }
 
   async function saveTest(test: Partial<Test>) {
-    const slug = generateSlug(test.title || '');
+    const title = test.title?.trim() ?? '';
+    if (!title || !validPrice(test.price_cents)) throw new Error(lang === 'ru' ? 'Укажите название и цену от $0.50 до $1000.' : 'Enter a title and a price between $0.50 and $1000.');
+    const slug = generateSlug(title);
+    if (!test.id && !slug) throw new Error(lang === 'ru' ? 'Название должно содержать буквы или цифры.' : 'The title must contain letters or numbers.');
 
     if (test.id) {
       // Update existing
       const { error } = await supabase
         .from('tests')
         .update({
-          title: test.title,
-          slug: slug,
+          title,
           description: test.description,
           price_cents: test.price_cents,
         })
         .eq('id', test.id);
 
+      if (error) throw error;
       if (!error) {
         setEditingTest(null);
         loadTests();
@@ -182,13 +202,14 @@ export function Admin() {
       const { error } = await supabase
         .from('tests')
         .insert({
-          title: test.title,
+          title,
           slug: slug,
           description: test.description,
           price_cents: test.price_cents,
           is_active: false,
         });
 
+      if (error) throw error;
       if (!error) {
         setNewTest(false);
         loadTests();
@@ -196,27 +217,33 @@ export function Admin() {
     }
   }
 
-  async function deleteTest(testId: string) {
-    if (!confirm('Are you sure? This will delete all questions in this test.')) return;
-
-    // Delete questions first
-    await supabase.from('questions').delete().eq('test_id', testId);
-    // Then delete test
-    const { error } = await supabase.from('tests').delete().eq('id', testId);
-
-    if (!error) {
-      loadTests();
-    }
+  async function archiveTest(test: Test) {
+    const restore = Boolean(test.archived_at);
+    if (!restore && !confirm(lang === 'ru' ? 'Архивировать тест? Вопросы и результаты сохранятся; начать новую попытку будет нельзя.' : 'Archive this test? Questions and results are kept; new attempts will be unavailable.')) return;
+    await runAction(async () => {
+      const { error } = await supabase.from('tests')
+        .update({ archived_at: restore ? null : new Date().toISOString(), is_active: false }).eq('id', test.id);
+      if (error) throw error;
+      await loadTests();
+    });
   }
 
   async function saveQuestion(question: Partial<Question>, testId: string) {
+    if (!question.question_text?.trim() || !Number.isInteger(question.question_number) || (question.question_number ?? 0) < 1) {
+      throw new Error(lang === 'ru' ? 'Введите текст и положительный целый номер вопроса.' : 'Enter question text and a positive whole question number.');
+    }
+    let parsed;
+    try { parsed = parseOptions(question.options); }
+    catch { throw new Error(lang === 'ru' ? 'Заполните все варианты ответа. Обозначения должны быть уникальны.' : 'Fill every answer option. Labels must be unique.'); }
+    if (!parsed.some(option => option.label === question.correct_answer)) throw new Error(lang === 'ru' ? 'Выберите правильный ответ из вариантов.' : 'Select a correct answer from the options.');
+    if ((questions[testId] ?? []).some(q => q.id !== question.id && q.question_number === question.question_number)) throw new Error(lang === 'ru' ? 'Вопрос с таким номером уже есть.' : 'This question number is already in use.');
     if (question.id) {
       // Update existing
       const { error } = await supabase
         .from('questions')
         .update({
           question_number: question.question_number,
-          question_text: question.question_text,
+          question_text: question.question_text.trim(),
           image_url: question.image_url,
           options: question.options,
           correct_answer: question.correct_answer,
@@ -224,6 +251,7 @@ export function Admin() {
         })
         .eq('id', question.id);
 
+      if (error) throw error;
       if (!error) {
         setEditingQuestion(null);
         loadQuestions(testId);
@@ -235,13 +263,14 @@ export function Admin() {
         .insert({
           test_id: testId,
           question_number: question.question_number,
-          question_text: question.question_text,
+          question_text: question.question_text.trim(),
           image_url: question.image_url,
           options: question.options,
           correct_answer: question.correct_answer,
           dimension: question.dimension,
         });
 
+      if (error) throw error;
       if (!error) {
         setNewQuestion(null);
         loadQuestions(testId);
@@ -250,13 +279,13 @@ export function Admin() {
   }
 
   async function deleteQuestion(questionId: string, testId: string) {
-    if (!confirm('Delete this question?')) return;
+    if (!confirm(lang === 'ru' ? 'Удалить этот вопрос?' : 'Delete this question?')) return;
 
+    await runAction(async () => {
     const { error } = await supabase.from('questions').delete().eq('id', questionId);
-
-    if (!error) {
-      loadQuestions(testId);
-    }
+    if (error) throw error;
+    await loadQuestions(testId);
+    });
   }
 
   function handleExpandTest(testId: string) {
@@ -505,6 +534,8 @@ export function Admin() {
         {/* Tests Tab */}
         {activeTab === 'tests' && (
           <>
+            {actionError && <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">{actionError}</p>}
+            <label className="mb-4 flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} />{lang === 'ru' ? 'Показать архив' : 'Show archived tests'}</label>
             {/* Tests Section */}
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-900">{t('admin.manage_tests')}</h2>
@@ -527,7 +558,7 @@ export function Admin() {
 
             {/* Tests List */}
             <div className="space-y-4">
-              {tests.map((test) => (
+              {tests.filter(test => showArchived || !test.archived_at).map((test) => (
                 <div key={test.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                   {/* Test Header */}
                   {editingTestId === test.id ? (
@@ -556,6 +587,7 @@ export function Admin() {
                         </div>
                         <div className="flex items-center gap-2">
                           <button
+                            disabled={pendingAction || Boolean(test.archived_at)}
                             onClick={() => toggleTestActive(test)}
                             className={`p-2 rounded-lg transition-colors ${test.is_active
                               ? 'text-green-600 hover:bg-green-50'
@@ -573,11 +605,12 @@ export function Admin() {
                             <Edit2 className="w-5 h-5" />
                           </button>
                           <button
-                            onClick={() => deleteTest(test.id)}
+                            disabled={pendingAction}
+                            onClick={() => archiveTest(test)}
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title={t('admin.delete')}
+                            title={test.archived_at ? (lang === 'ru' ? 'Восстановить из архива' : 'Restore from archive') : (lang === 'ru' ? 'Архивировать тест' : 'Archive test')}
                           >
-                            <Trash2 className="w-5 h-5" />
+                            <span className="text-xs font-medium">{test.archived_at ? (lang === 'ru' ? 'Вернуть' : 'Restore') : (lang === 'ru' ? 'В архив' : 'Archive')}</span>
                           </button>
                           <button
                             onClick={() => handleExpandTest(test.id)}
@@ -614,7 +647,7 @@ export function Admin() {
                       {/* New Question Form */}
                       {newQuestion === test.id && (
                         <QuestionForm
-                          questionNumber={(questions[test.id]?.length || 0) + 1}
+                          questionNumber={nextQuestionNumber(questions[test.id] ?? [])}
                           onSave={(q) => saveQuestion(q, test.id)}
                           onCancel={() => setNewQuestion(null)}
                         />
@@ -705,16 +738,26 @@ function TestForm({
   onCancel
 }: {
   test?: Test;
-  onSave: (test: Partial<Test>) => void;
+  onSave: (test: Partial<Test>) => Promise<void>;
   onCancel: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const saveLock = useRef(false);
   const [title, setTitle] = useState(test?.title || '');
   const [description, setDescription] = useState(test?.description || '');
   const [price, setPrice] = useState(test ? (test.price_cents / 100).toString() : '5');
 
   return (
-    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+    <form className="bg-indigo-50 p-4 rounded-lg border border-indigo-200" onSubmit={async event => {
+      event.preventDefault(); if (saveLock.current) return;
+      saveLock.current = true; setSaving(true); setSaveError('');
+      try { await onSave({ id: test?.id, title: title.trim(), description, price_cents: Math.round(Number(price) * 100) }); }
+      catch (error) { setSaveError(saveErrorMessage(error, lang)); }
+      finally { saveLock.current = false; setSaving(false); }
+    }}>
+      <fieldset disabled={saving}>
       <div className="space-y-3">
         <input
           type="text"
@@ -739,7 +782,10 @@ function TestForm({
             type="number"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            min="0"
+            min="0.50"
+            max="1000"
+            required
+            aria-label={t('admin.price')}
             step="0.01"
             className="w-24 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
@@ -747,6 +793,7 @@ function TestForm({
       </div>
       <div className="flex justify-end gap-2 mt-4">
         <button
+          type="button"
           onClick={onCancel}
           aria-label={t('admin.cancel')}
           className="px-4 py-2 text-gray-600 hover:text-gray-800"
@@ -754,20 +801,17 @@ function TestForm({
           <X className="w-5 h-5" />
         </button>
         <button
-          onClick={() => onSave({
-            id: test?.id,
-            title,
-            description,
-            price_cents: Math.round(parseFloat(price) * 100),
-          })}
-          disabled={!title}
+          type="submit"
+          disabled={saving || !title.trim() || !validPrice(Math.round(Number(price) * 100))}
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
-          {t('admin.save')}
+          {saving ? (lang === 'ru' ? 'Сохранение…' : 'Saving…') : t('admin.save')}
         </button>
       </div>
-    </div>
+      {saveError && <p role="alert" className="mt-3 text-red-800">{saveError}</p>}
+      </fieldset>
+    </form>
   );
 }
 
@@ -780,10 +824,13 @@ function QuestionForm({
 }: {
   question?: Question;
   questionNumber: number;
-  onSave: (question: Partial<Question>) => void;
+  onSave: (question: Partial<Question>) => Promise<void>;
   onCancel: () => void;
 }) {
   const { t, lang } = useLanguage();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const saveLock = useRef(false);
   const [qNumber, setQNumber] = useState(question?.question_number || questionNumber);
   const [text, setText] = useState(question?.question_text || '');
   const [imageUrl, setImageUrl] = useState(question?.image_url || '');
@@ -868,12 +915,23 @@ function QuestionForm({
   }
 
   return (
-    <div className="bg-white p-4 rounded-lg border border-indigo-200 mb-2">
+    <form className="bg-white p-4 rounded-lg border border-indigo-200 mb-2" onSubmit={async event => {
+      event.preventDefault(); if (saveLock.current || uploading) return;
+      saveLock.current = true; setSaving(true); setSaveError('');
+      try { await onSave({ id: question?.id, question_number: qNumber, question_text: text.trim(), image_url: imageUrl || null, options: JSON.stringify(options), correct_answer: correctAnswer, dimension }); }
+      catch (error) { setSaveError(saveErrorMessage(error, lang)); }
+      finally { saveLock.current = false; setSaving(false); }
+    }}>
+      <fieldset disabled={saving}>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500">{t('admin.question_num')}</label>
           <input
             type="number"
+            min="1"
+            step="1"
+            required
+            aria-label={t('admin.question_num')}
             value={qNumber}
             onChange={(e) => setQNumber(parseInt(e.target.value))}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
@@ -882,6 +940,7 @@ function QuestionForm({
         <div>
           <label className="text-xs text-gray-500">{t('admin.dimension')}</label>
           <select
+            aria-label={t('admin.dimension')}
             value={dimension}
             onChange={(e) => setDimension(e.target.value as Question['dimension'])}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
@@ -897,6 +956,7 @@ function QuestionForm({
       <div className="mt-3">
         <label className="text-xs text-gray-500">{t('admin.question_text')}</label>
         <textarea
+          aria-label={t('admin.question_text')}
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={2}
@@ -1011,6 +1071,7 @@ function QuestionForm({
       <div className="mt-3">
         <label className="text-xs text-gray-500">{t('admin.correct_answer')}</label>
         <select
+          aria-label={t('admin.correct_answer')}
           value={correctAnswer}
           onChange={(e) => setCorrectAnswer(e.target.value)}
           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
@@ -1022,26 +1083,28 @@ function QuestionForm({
       </div>
 
       <div className="flex justify-end gap-2 mt-4">
-        <button onClick={onCancel} className="px-3 py-1.5 text-gray-600 hover:text-gray-800 text-sm">
+        <button type="button" disabled={uploading} onClick={onCancel} className="px-3 py-1.5 text-gray-600 hover:text-gray-800 text-sm">
           {t('admin.cancel')}
         </button>
         <button
-          onClick={() => onSave({
-            id: question?.id,
-            question_number: qNumber,
-            question_text: text,
-            image_url: imageUrl || null,
-            options: JSON.stringify(options),
-            correct_answer: correctAnswer,
-            dimension,
-          })}
-          disabled={!text}
+          type="submit"
+          disabled={saving || uploading || !text.trim() || options.some(option => !option.value.trim()) || !Number.isInteger(qNumber) || qNumber < 1}
           className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 disabled:opacity-50"
         >
           <Save className="w-3 h-3" />
-          {t('admin.save')}
+          {saving ? (lang === 'ru' ? 'Сохранение…' : 'Saving…') : t('admin.save')}
         </button>
       </div>
-    </div>
+      {saveError && <p role="alert" className="mt-3 text-red-800">{saveError}</p>}
+      </fieldset>
+    </form>
   );
+}
+
+function saveErrorMessage(error: unknown, lang: string): string {
+  const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
+  if (code === '23505') return lang === 'ru' ? 'Такой номер или адрес уже занят. Измените значение.' : 'This number or address is already in use.';
+  if (code === '42501') return lang === 'ru' ? 'Недостаточно прав. Войдите заново под администратором.' : 'Permission denied. Sign in again as an administrator.';
+  if (error instanceof Error) return error.message;
+  return lang === 'ru' ? 'Не удалось сохранить изменения. Проверьте подключение и попробуйте ещё раз.' : 'Could not save changes. Check your connection and retry.';
 }

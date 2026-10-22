@@ -32,29 +32,15 @@ export function useContent() {
     }, [loadContent]);
 
     const saveContent = useCallback(async (key: string, value: string) => {
-        // Try to update first
-        const { error: updateError, count } = await supabase
-            .from('home_content')
-            .update({ value, updated_at: new Date().toISOString() })
-            .eq('key', key);
-
-        // If no rows updated (key doesn't exist), insert new row
-        if (updateError || count === 0) {
-            const { error: insertError } = await supabase
-                .from('home_content')
-                .upsert({ key, value, updated_at: new Date().toISOString() });
-
-            if (insertError) {
-                console.error('Error saving content:', insertError);
-                throw insertError;
-            }
-        }
+        const { error } = await supabase.from('home_content')
+            .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+        if (error) throw error;
 
         setContent(prev => ({ ...prev, [key]: value }));
     }, []);
 
     const getContent = useCallback((key: string, fallback: string): string => {
-        return content[key] || fallback;
+        return content[key] ?? fallback;
     }, [content]);
 
     return { content, loading, saveContent, getContent, reloadContent: loadContent };

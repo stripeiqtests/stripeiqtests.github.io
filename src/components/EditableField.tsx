@@ -29,10 +29,6 @@ export function EditableField({
     const hasChanges = editValue !== value;
 
     useEffect(() => {
-        setEditValue(value);
-    }, [value]);
-
-    useEffect(() => {
         if (isEditing && inputRef.current) {
             inputRef.current.focus();
             inputRef.current.select();
@@ -155,7 +151,7 @@ export function EditableField({
             className="relative inline-flex items-center gap-2 group cursor-pointer"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            onClick={() => setIsEditing(true)}
+            onClick={() => { setEditValue(value); setSaveError(null); setIsEditing(true); }}
         >
             <Component className={`${className} ${isHovered ? 'bg-indigo-50 rounded' : ''}`}>
                 {value}
@@ -165,7 +161,7 @@ export function EditableField({
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg'
                     : 'bg-transparent text-indigo-500 border-indigo-300 hover:border-indigo-500'
                     }`}
-                onClick={() => setIsEditing(true)}
+                onClick={() => { setEditValue(value); setSaveError(null); setIsEditing(true); }}
                 title="Click to edit"
             >
                 <Edit2 className="w-4 h-4" />

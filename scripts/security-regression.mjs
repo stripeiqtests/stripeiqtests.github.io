@@ -12,6 +12,9 @@ const resultsPage = read('src/pages/Results.tsx');
 const checkoutFunction = read('supabase/functions/create-checkout/index.ts');
 const verifyFunction = read('supabase/functions/verify-payment/index.ts');
 const emailFunction = read('supabase/functions/send-results-email/index.ts');
+const paymentFunctions = read('supabase/functions/_shared/payments.ts');
+const paymentMigration = read('supabase/migrations/20261022200000_payment_fulfillment.sql');
+const webhookFunction = read('supabase/functions/stripe-webhook/index.ts');
 const supabaseConfig = read('supabase/config.toml');
 const hardeningMigration = read('supabase/migrations/20260719000000_high_roi_security_hardening.sql');
 const schema = read('supabase/schema.sql');
@@ -31,8 +34,11 @@ assert.match(resultsPage, /rpc\(['"]get_test_session['"]/);
 assert.doesNotMatch(resultsPage, /dangerouslySetInnerHTML/);
 
 assert.match(checkoutFunction, /accessToken/);
-assert.match(checkoutFunction, /session\.access_token\s*!==\s*accessToken/);
-assert.match(verifyFunction, /resultAccessToken/);
+assert.match(paymentMigration, /s\.access_token is distinct from p_access_token/);
+assert.match(paymentFunctions, /resultAccessToken/);
+assert.match(verifyFunction, /fulfillPayment/);
+assert.match(webhookFunction, /constructEventAsync/);
+assert.match(paymentMigration, /revoke all on function public\.fulfill_checkout[^;]+from public,anon,authenticated/);
 assert.match(emailFunction, /authorization.*Bearer \$\{serviceKey\}/s);
 assert.match(supabaseConfig, /\[functions\.create-checkout\][\s\S]*?verify_jwt\s*=\s*false/);
 assert.match(supabaseConfig, /\[functions\.verify-payment\][\s\S]*?verify_jwt\s*=\s*false/);
@@ -48,7 +54,9 @@ assert.doesNotMatch(deployment, /sk_(?:test|live)_[A-Za-z0-9_-]{20,}/);
 assert.doesNotMatch(deployment, /login with password:\s*`?[^\r\n]+/i);
 assert.equal(existsSync(resolve(root, 'messages.html')), false);
 
-assert.match(indexHtml, /send_page_view:\s*false/);
+assert.match(analytics, /send_page_view:\s*false/);
+assert.doesNotMatch(indexHtml, /<script[^>]+src=["'][^"']*(googletagmanager|facebook)/i);
+assert.match(analytics, /readConsent\(\)\s*!==\s*'granted'/);
 assert.doesNotMatch(indexHtml, /ev=PageView/);
 assert.doesNotMatch(analytics, /transaction_id:\s*sessionId/);
 

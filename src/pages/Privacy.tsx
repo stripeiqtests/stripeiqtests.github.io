@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
+import { SupportLink } from '../components/SupportLink';
 
 export function Privacy() {
     const { lang } = useLanguage();
@@ -76,7 +77,7 @@ export function Privacy() {
                                 <h2 className="text-xl font-semibold text-gray-800 mt-6 mb-3">6. Контакты</h2>
                                 <p className="text-gray-600 mb-4">
                                     По всем вопросам, связанным с конфиденциальностью, вы можете связаться с нами
-                                    через форму обратной связи на сайте.
+                                    по контакту поддержки: <SupportLink showContact />.
                                 </p>
                             </>
                         ) : (
@@ -133,7 +134,7 @@ export function Privacy() {
                                 <h2 className="text-xl font-semibold text-gray-800 mt-6 mb-3">6. Contact</h2>
                                 <p className="text-gray-600 mb-4">
                                     For any privacy-related questions, please contact us through the
-                                    feedback form on the website.
+                                    support contact: <SupportLink showContact />.
                                 </p>
                             </>
                         )}

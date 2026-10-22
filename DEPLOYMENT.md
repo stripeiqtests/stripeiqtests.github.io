@@ -1,5 +1,11 @@
 # IQ Test — secure deployment
 
+> **2026-10-22 audit release:** read `AUDIT_REMEDIATION.md` and
+> `PAYMENT_ROLLOUT.md` first. Production has manually applied SQL and no reconciled
+> CLI migration history. Do not blindly run the historical `db push` instructions
+> below. Only the explicitly approved `20261022190000_audit_safety.sql` has been
+> applied in this audit phase; newer payment code/migrations remain local.
+
 The application is a static React frontend backed by Supabase, Stripe and
 Resend. Test takers do not need accounts. Administrators sign in through
 Supabase Auth.

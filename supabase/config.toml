@@ -11,3 +11,7 @@ verify_jwt = false
 
 [functions.send-results-email]
 verify_jwt = false
+
+# Authenticated with the Stripe signature over the raw request body.
+[functions.stripe-webhook]
+verify_jwt = false
