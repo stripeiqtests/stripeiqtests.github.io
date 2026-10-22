@@ -94,7 +94,7 @@ export function EditableField({
     `.trim();
 
         return (
-            <div className="mb-3 inline-flex w-full min-w-0 flex-col gap-2 align-top" aria-busy={isSaving}>
+            <div className="relative inline-block w-full min-w-0 align-top" aria-busy={isSaving}>
                 {multiline ? (
                     <textarea
                         ref={inputRef as React.RefObject<HTMLTextAreaElement>}
@@ -102,6 +102,7 @@ export function EditableField({
                         onChange={(e) => { setEditValue(e.target.value); setSaveError(null); }}
                         onKeyDown={handleKeyDown}
                         className={inputClasses}
+                        style={{ paddingRight: '5rem' }}
                         rows={3}
                         disabled={isSaving}
                     />
@@ -113,17 +114,18 @@ export function EditableField({
                         onChange={(e) => { setEditValue(e.target.value); setSaveError(null); }}
                         onKeyDown={handleKeyDown}
                         className={inputClasses}
+                        style={{ paddingRight: '5rem' }}
                         disabled={isSaving}
                     />
                 )}
-                {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
-                <div className="flex justify-end gap-2">
+                {saveError && <p role="alert" className="absolute left-0 top-full z-20 mt-1 w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-red-700 shadow-md">{saveError}</p>}
+                <div className={`absolute right-1.5 z-10 flex gap-1 rounded-md bg-white p-0.5 ${multiline ? 'top-2' : 'top-1/2 -translate-y-1/2'}`}>
                     <button
                         type="button"
                         onClick={handleCancel}
                         aria-label={t('common.cancel')}
                         title={t('common.cancel')}
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-50 ${hasChanges
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-50 ${hasChanges
                             ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
                             : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-100'}`}
                         disabled={isSaving}
@@ -135,7 +137,7 @@ export function EditableField({
                         onClick={handleSave}
                         aria-label={t('admin.save')}
                         title={t('admin.save')}
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed ${hasChanges
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed ${hasChanges
                             ? 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60'
                             : 'border-gray-200 bg-gray-100 text-gray-400'}`}
                         disabled={isSaving || !hasChanges}
