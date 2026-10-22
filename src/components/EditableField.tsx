@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Edit2, Check, X } from 'lucide-react';
+import { Edit2, Check, X, LoaderCircle } from 'lucide-react';
 import { useAdmin } from '../lib/AdminContext';
+import { useLanguage } from '../lib/i18n';
 
 interface EditableFieldProps {
     value: string;
@@ -18,11 +19,14 @@ export function EditableField({
     multiline = false
 }: EditableFieldProps) {
     const { isAdmin } = useAdmin();
+    const { t, lang } = useLanguage();
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(value);
     const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [isHovered, setIsHovered] = useState(false);
     const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+    const hasChanges = editValue !== value;
 
     useEffect(() => {
         setEditValue(value);
@@ -36,33 +40,42 @@ export function EditableField({
     }, [isEditing]);
 
     const handleSave = async () => {
-        if (editValue === value) {
+        if (isSaving) return;
+        if (!hasChanges) {
             setIsEditing(false);
             return;
         }
 
         setIsSaving(true);
+        setSaveError(null);
         try {
             await onSave(editValue);
             setIsEditing(false);
         } catch (error) {
             console.error('Failed to save:', error);
-            setEditValue(value);
+            setSaveError(lang === 'ru'
+                ? 'Не удалось сохранить. Попробуйте ещё раз.'
+                : 'Could not save. Please try again.');
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleCancel = () => {
+        if (isSaving) return;
         setEditValue(value);
+        setSaveError(null);
         setIsEditing(false);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (isSaving) return;
         if (e.key === 'Enter' && !multiline) {
-            handleSave();
+            e.preventDefault();
+            void handleSave();
         }
         if (e.key === 'Escape') {
+            e.preventDefault();
             handleCancel();
         }
     };
@@ -81,12 +94,12 @@ export function EditableField({
     `.trim();
 
         return (
-            <div className="relative inline-block w-full">
+            <div className="mb-3 inline-flex w-full min-w-0 flex-col gap-2 align-top" aria-busy={isSaving}>
                 {multiline ? (
                     <textarea
                         ref={inputRef as React.RefObject<HTMLTextAreaElement>}
                         value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
+                        onChange={(e) => { setEditValue(e.target.value); setSaveError(null); }}
                         onKeyDown={handleKeyDown}
                         className={inputClasses}
                         rows={3}
@@ -97,26 +110,37 @@ export function EditableField({
                         ref={inputRef as React.RefObject<HTMLInputElement>}
                         type="text"
                         value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
+                        onChange={(e) => { setEditValue(e.target.value); setSaveError(null); }}
                         onKeyDown={handleKeyDown}
                         className={inputClasses}
                         disabled={isSaving}
                     />
                 )}
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
+                <div className="flex justify-end gap-2">
                     <button
+                        type="button"
                         onClick={handleCancel}
-                        className="p-1 text-gray-400 hover:text-red-500 rounded"
+                        aria-label={t('common.cancel')}
+                        title={t('common.cancel')}
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-50 ${hasChanges
+                            ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                            : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-100'}`}
                         disabled={isSaving}
                     >
                         <X className="w-4 h-4" />
                     </button>
                     <button
+                        type="button"
                         onClick={handleSave}
-                        className="p-1 text-gray-400 hover:text-green-500 rounded"
-                        disabled={isSaving}
+                        aria-label={t('admin.save')}
+                        title={t('admin.save')}
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed ${hasChanges
+                            ? 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60'
+                            : 'border-gray-200 bg-gray-100 text-gray-400'}`}
+                        disabled={isSaving || !hasChanges}
                     >
-                        <Check className="w-4 h-4" />
+                        {isSaving ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                     </button>
                 </div>
             </div>
