@@ -13,29 +13,31 @@ import { openConsentSettings } from '../lib/consent';
 export function Home() {
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError,setLoadError]=useState(false);
   const { t, lang } = useLanguage();
   const { isAdmin } = useAdmin();
   const { getContent, saveContent } = useContent();
 
   useEffect(() => {
-    // The request resolves before it updates local UI state.
-    // eslint-disable-next-line react-hooks/immutability
+    // Initial loading and explicit retries share this asynchronous loader.
     loadTests();
   }, []);
 
   async function loadTests() {
+    setLoading(true);setLoadError(false);
+    try {
     const { data, error } = await supabase
       .from('tests')
       .select('*')
       .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .retry(false)
+      .abortSignal(AbortSignal.timeout(8000));
 
-    if (error) {
-      console.error('Error loading tests:', error);
-    } else {
-      setTests(data || []);
-    }
-    setLoading(false);
+    if(error)throw error;
+    setTests(data||[]);
+    }catch{setLoadError(true);}
+    finally{setLoading(false);}
   }
 
   const heroTitle = lang === 'ru'
@@ -350,6 +352,13 @@ export function Home() {
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
             <p className="mt-4 text-gray-500">{t('common.loading')}</p>
+          </div>
+        ) : loadError ? (
+          <div role="alert" className="rounded-xl border border-amber-200 bg-white p-6 text-center">
+            <h3 className="font-semibold text-gray-900">{lang==='ru'?'Не удалось загрузить список тестов':'Could not load available tests'}</h3>
+            <p className="mt-2 text-gray-700">{lang==='ru'?'Проверьте подключение и повторите загрузку.':'Check your connection and try again.'}</p>
+            <button className="my-4 rounded-lg border border-indigo-600 px-4 py-2 text-indigo-700" onClick={()=>void loadTests()}>{lang==='ru'?'Повторить':'Retry'}</button>
+            <p><SupportLink /></p>
           </div>
         ) : tests.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border border-gray-100">

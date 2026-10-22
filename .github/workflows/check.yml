@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: validate-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -28,6 +32,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm test:security
       - run: pnpm test:rich-text
+      - run: pnpm test:hosting
       - run: pnpm test:edge
       - run: pnpm test:database
       - run: pnpm exec playwright install --with-deps chromium

@@ -9,13 +9,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/prepare-hosting.mjs",
     "lint": "eslint .",
     "test:security": "node scripts/security-regression.mjs",
     "test:rich-text": "node scripts/rich-text-regression.mjs",
     "test:browser": "playwright test",
     "test:database": "node scripts/test-database.mjs",
     "test:edge": "deno test --config supabase/functions/deno.json --allow-env supabase/functions/tests",
+    "test:hosting": "node --test scripts/hosting.test.mjs",
     "verify:production-target": "node scripts/assert-production-target.mjs",
     "preview": "vite preview"
   },

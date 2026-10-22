@@ -244,7 +244,7 @@ export function Results() {
             to="/"
             className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700"
           >
-            {lang === 'ru' ? 'Пройти новый тест' : 'Take a New Test'}
+            {lang === 'ru' ? 'На главную' : 'Back to Home'}
           </Link>
         </div>
       </div>

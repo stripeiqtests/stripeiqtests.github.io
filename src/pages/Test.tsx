@@ -51,6 +51,8 @@ export function Test() {
       .select('*')
       .eq('slug', slug)
       .eq('is_active', true)
+      .retry(false)
+      .abortSignal(AbortSignal.timeout(8000))
       .maybeSingle();
 
     if (request !== requestId.current) return;

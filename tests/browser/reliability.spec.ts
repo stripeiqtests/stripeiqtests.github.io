@@ -1,5 +1,13 @@
 import { test, expect, login } from './fixtures';
 
+test('a failed homepage request does not claim no tests exist and can be retried',async({page,api})=>{
+  api.failTests=true;await page.goto('/');
+  await expect(page.getByRole('heading',{name:'Не удалось загрузить список тестов',exact:true})).toBeVisible();
+  await expect(page.getByText('Тестов пока нет',{exact:true})).toHaveCount(0);
+  api.failTests=false;await page.getByRole('button',{name:'Повторить',exact:true}).click();
+  await expect(page.getByTestId('hero-start')).toBeVisible();
+});
+
 test('a double answer advances once; manual navigation cancels pending advance', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/iq-test');

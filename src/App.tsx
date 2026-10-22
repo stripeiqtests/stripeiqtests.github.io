@@ -6,6 +6,7 @@ import { AdminProvider } from './lib/AdminContext';
 import { CookieConsent } from './components/CookieConsent';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SiteSettingsProvider } from './lib/siteSettings';
+import {RouteMetadata} from './components/RouteMetadata';
 
 // Lazy load heavy components
 const Admin = lazy(() => import('./pages/Admin').then(m => ({ default: m.Admin })));
@@ -34,6 +35,7 @@ function App() {
       <LanguageProvider>
         <SiteSettingsProvider>
         <BrowserRouter>
+          <RouteMetadata />
           <CookieConsent />
           <ErrorBoundary><Suspense fallback={<LoadingSpinner />}>
             <Routes>

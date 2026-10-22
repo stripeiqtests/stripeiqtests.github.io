@@ -44,6 +44,9 @@ jobs:
       - name: Rich-text regression checks
         run: pnpm test:rich-text
 
+      - name: Hosting artifact contracts
+        run: pnpm test:hosting
+
       - name: Database contracts in isolated PostgreSQL
         run: pnpm test:database
 

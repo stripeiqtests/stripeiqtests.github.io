@@ -53,7 +53,10 @@ try {
   created = true;
   let ready = false;
   for (let i = 0; i < 30; i++) {
-    const probe = spawnSync('docker', ['exec', container, 'pg_isready', '-U', 'postgres', '-d', 'app_test'], { encoding: 'utf8', timeout: 5000 });
+    // The image briefly starts a socket-only initialization server and then
+    // restarts it. TCP readiness identifies the final server, avoiding a race
+    // where psql runs while the initialization socket disappears on fresh CI.
+    const probe = spawnSync('docker', ['exec', container, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'app_test'], { encoding: 'utf8', timeout: 5000 });
     if (probe.status === 0) { ready = true; break; }
     await new Promise(resolve => setTimeout(resolve, 500));
   }

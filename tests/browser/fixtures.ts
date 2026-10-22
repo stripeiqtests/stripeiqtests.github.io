@@ -9,6 +9,7 @@ export interface FixtureApi {
   content: Record<string, string>;
   settings: Record<string, string>;
   failQuestions: boolean;
+  failTests?:boolean;
   failWrites: boolean;
   requests: { path: string; method: string; body: Record<string, unknown> | null }[];
   tracking: string[];
@@ -38,6 +39,7 @@ export const test = base.extend<{ api: FixtureApi }>({
       if (url.pathname === '/auth/v1/token') data = { access_token: jwt, refresh_token: 'fixture-refresh', expires_in: 3600, token_type: 'bearer', user };
       else if (url.pathname === '/auth/v1/user') data = user;
       else if (url.pathname === '/rest/v1/tests') {
+        if(api.failTests)return route.fulfill({status:503,headers,contentType:'application/json',body:'{"message":"fixture test list unavailable"}'});
         if (method === 'PATCH' && !api.failWrites) Object.assign(api.test, body);
         const rows = url.searchParams.get('is_active') === 'eq.true' && !api.test.is_active ? [] : [api.test];
         data = single ? rows[0] ?? null : rows;
