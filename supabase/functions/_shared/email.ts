@@ -1,4 +1,12 @@
 import type { Database } from "./database.ts";
+import {
+  defaultPresentation,
+  parsePresentation,
+  type Presentation,
+  profileIntro,
+  selectProfile,
+  validPresentation,
+} from "./presentation.ts";
 
 interface Job {
   id: string;
@@ -21,10 +29,10 @@ interface Result {
   access_token: string;
   is_paid: boolean;
   overall_score: number;
-  analyst_score: number;
-  strategist_score: number;
-  observer_score: number;
-  intuitive_score: number;
+  analyst_score: number | null;
+  strategist_score: number | null;
+  observer_score: number | null;
+  intuitive_score: number | null;
 }
 interface ArchetypeCopy {
   title_ru: string;
@@ -50,12 +58,6 @@ function scoreInterpretation(score: number, ru: boolean): string {
   if (score >= 40) return "Average result. There is potential for development.";
   return "There are opportunities for improvement in this area.";
 }
-function leadingIndex(scores: number[]): number | null {
-  const maximum = Math.max(...scores);
-  return maximum > 0 && scores.filter((score) => score === maximum).length === 1
-    ? scores.indexOf(maximum)
-    : null;
-}
 export function escapeHtml(text: string): string {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(
     ">",
@@ -67,6 +69,7 @@ export function renderEmail(
   s: Result,
   support: string,
   archetype: ArchetypeCopy | null = null,
+  presentation: Presentation = defaultPresentation(),
 ): EmailPayload {
   const ru = job.language === "ru";
   const link =
@@ -100,12 +103,7 @@ export function renderEmail(
       "Visual perception, spatial thinking",
       "Creativity, associative thinking",
     ];
-  const leader = leadingIndex(scores);
-  const profileText = leader === null
-    ? ""
-    : ru
-    ? `Ваша сильнейшая сторона — ${labels[leader]}.`
-    : `Your strongest dimension is ${labels[leader]}.`;
+  const profileText = profileIntro(s, job.language, presentation);
   const profileHeading = ru
     ? "Ваш когнитивный профиль"
     : "Your Cognitive Profile";
@@ -155,7 +153,9 @@ export function renderEmail(
           `<li>${label}: ${scores[i]}%<p>${descriptions[i]}</p></li>`
         ).join("")
       }</ul><p>${explanation}</p>${
-        profileText ? `<h3>${profileHeading}</h3><p>${profileText}</p>` : ""
+        profileText
+          ? `<h3>${profileHeading}</h3><p>${escapeHtml(profileText)}</p>`
+          : ""
       }${
         archetype
           ? `<h3>${escapeHtml(archetypeTitle)}</h3>${archetypeHtml}`
@@ -195,30 +195,29 @@ export async function deliverEmails(
           `id=eq.${job.session_id}&select=id,email,access_token,is_paid,overall_score,analyst_score,strategist_score,observer_score,intuitive_score`,
         );
         if (!s?.is_paid || !s.email) throw new Error("Missing paid recipient");
-        const settings = await db.read<{ value: string }[]>(
+        const settings = await db.read<{ key: string; value: string }[]>(
           "app_settings",
-          "key=eq.support_contact&select=value",
+          "key=in.(support_contact,result_presentation)&select=key,value",
         );
         let archetype: ArchetypeCopy | null = null;
-        const leader = leadingIndex([
-          s.analyst_score,
-          s.strategist_score,
-          s.observer_score,
-          s.intuitive_score,
-        ]);
+        const presentationValue = settings.find((row) =>
+          row.key === "result_presentation"
+        )?.value;
+        if (
+          presentationValue && !validPresentation(JSON.parse(presentationValue))
+        ) {
+          throw new Error("Invalid presentation configuration");
+        }
+        const presentation = parsePresentation(presentationValue);
+        const selection = selectProfile(s, presentation);
+        const leader = selection.kind === "single"
+          ? selection.leaders[0]
+          : null;
         if (leader !== null) {
           try {
-            const dimensions = [
-              "analyst",
-              "strategist",
-              "observer",
-              "intuitive",
-            ];
             [archetype] = await db.read<ArchetypeCopy[]>(
               "archetype_results",
-              `dimension=eq.${
-                dimensions[leader]
-              }&select=title_ru,title_en,content_ru,content_en`,
+              `dimension=eq.${leader}&select=title_ru,title_en,content_ru,content_en`,
             );
           } catch {
             /* Keep the preceding best-effort behavior for optional descriptions. */
@@ -232,8 +231,10 @@ export async function deliverEmails(
           p_payload: renderEmail(
             job,
             s,
-            settings[0]?.value || "stripeiqtests@proton.me",
+            settings.find((row) => row.key === "support_contact")?.value ||
+              "stripeiqtests@proton.me",
             archetype,
+            presentation,
           ),
         });
       }

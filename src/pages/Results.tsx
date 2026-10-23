@@ -12,6 +12,8 @@ import { RichInlineText, RichTextContent } from '../components/RichTextContent';
 import { readSessionAccess, resultPath } from '../lib/sessionAccess';
 import { SupportLink } from '../components/SupportLink';
 import { getScoreInterpretation, getProfileDescription } from '../lib/resultSummary';
+import { usePresentation } from '../lib/usePresentation';
+import { selectProfile } from '../../supabase/functions/_shared/presentation.ts';
 
 export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -19,6 +21,7 @@ export function Results() {
   const { t, lang } = useLanguage();
   const { isAdmin,authLoading } = useAdmin();
   const { getContent, saveContent } = useContent();
+  const { presentation, loading: presentationLoading, error: presentationError, reload: reloadPresentation, save: savePresentation } = usePresentation();
 
   // Preview mode check
   const isPreview = isAdmin && searchParams.get('preview') === 'admin';
@@ -31,6 +34,7 @@ export function Results() {
     email: 'demo@example.com',
     answers: '{}',
     is_paid: true,
+    email_status: 'sent',
     overall_score: 78,
     analyst_score: 85,
     strategist_score: 72,
@@ -110,32 +114,18 @@ export function Results() {
     }
   }
 
-  // Load archetype result based on strongest dimension
-  async function loadArchetypeResult(sess: TestSession,request:number) {
-    const scores = [
-      { dimension: 'analyst', score: sess.analyst_score || 0 },
-      { dimension: 'strategist', score: sess.strategist_score || 0 },
-      { dimension: 'observer', score: sess.observer_score || 0 },
-      { dimension: 'intuitive', score: sess.intuitive_score || 0 },
-    ];
-    const strongest = scores.reduce((max, s) => s.score > max.score ? s : max);
-    if (!sess.is_paid || strongest.score <= 0 || scores.filter(s => s.score === strongest.score).length > 1) {
-      if(request===sessionRequest.current)setArchetypeResult(null);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('archetype_results')
-      .select('*')
-      .eq('dimension', strongest.dimension)
-      .abortSignal(AbortSignal.timeout(8000))
-      .single();
-
-    if (request===sessionRequest.current && !error && data) {
-      setArchetypeResult(data);
-    }
-  }
-
+  const selection = loadedSession?.is_paid && !presentationLoading && !presentationError ? selectProfile(loadedSession, presentation) : null;
+  const chosenDimension = selection?.kind === 'single' ? selection.leaders[0] : null;
+  useEffect(() => {
+    if (!chosenDimension) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    void supabase.from('archetype_results').select('*').eq('dimension',chosenDimension)
+      .retry(false).abortSignal(controller.signal).maybeSingle().then(({data,error})=>{
+        if (!controller.signal.aborted && !error) setArchetypeResult(data);
+      });
+    return () => { clearTimeout(timeout);controller.abort(); };
+  },[chosenDimension,loadedSession?.id]);
 
   async function loadSession() {
     if (!sessionId) return;
@@ -176,9 +166,6 @@ export function Results() {
     if(contextError)throw contextError;
     const deliveryStatus = context?.email_status;
     setSession({...sessionData,email_status:typeof deliveryStatus==='string' && ['pending','sending','sent','failed'].includes(deliveryStatus) ? deliveryStatus : null});
-
-    // Load archetype result based on scores
-    void loadArchetypeResult(sessionData,request);
 
     // Load test info
     const { data: testData } = context?.test ? {data:context.test as Test} : await supabase
@@ -470,10 +457,10 @@ export function Results() {
   const resultsTitle = lang === 'ru' ? 'Результаты IQ теста' : 'Your IQ Test Results';
   const overallScoreLabel = lang === 'ru' ? 'ОБЩИЙ БАЛЛ' : 'OVERALL SCORE';
   const profileHeading = lang === 'ru' ? 'Ваш когнитивный профиль' : 'Your Cognitive Profile';
-  const emailSentText = session.email_status === 'sent' ? (lang === 'ru' ? 'Копия передана почтовому сервису для отправки на' : 'A copy was accepted by the email service for')
-    : session.email_status === 'failed' ? (lang === 'ru' ? 'Не удалось отправить письмо. Контакт для копии:' : 'The email could not be sent. Address for your copy:')
-      : session.email_status === 'pending' || session.email_status === 'sending' ? (lang === 'ru' ? 'Копия результата ожидает отправки на' : 'Your result copy is queued for')
-      : (lang === 'ru' ? 'Email для копии результата:' : 'Email for your result copy:');
+  const messageLocale = lang === 'ru' ? 'ru' : 'en';
+  const emailMessageKey = session.email_status === 'sent' ? 'emailSent' : session.email_status === 'failed' ? 'emailFailed'
+    : session.email_status === 'pending' || session.email_status === 'sending' ? 'emailQueued' : 'emailUnknown';
+  const emailSentText = presentation.messages[emailMessageKey][messageLocale];
   const takeAnotherText = lang === 'ru' ? 'Пройти другой тест' : 'Take Another Test';
 
   // Dimension labels
@@ -636,13 +623,16 @@ export function Results() {
           ) : (
             <h2 className="text-lg font-semibold text-gray-900 mb-4">{getContent(`results_profile_heading${langKey}`, profileHeading)}</h2>
           )}
-          <p className="text-gray-600 leading-relaxed">
-            {getProfileDescription(session, lang)}
-          </p>
+          {presentationError ? <div role="alert" className="text-red-800">
+            <p>{lang === 'ru' ? 'Не удалось загрузить правила отображения результата.' : 'Could not load the result presentation rules.'}</p>
+            <button className="mt-2 rounded border px-3 py-2" onClick={() => void reloadPresentation()}>{lang === 'ru' ? 'Повторить' : 'Retry'}</button>
+          </div> : <p className="text-gray-600 leading-relaxed">
+            {presentationLoading ? t('common.loading') : getProfileDescription(session, lang, presentation)}
+          </p>}
         </div>
 
         {/* Archetype Result Block */}
-        {archetypeResult && (
+        {archetypeResult && archetypeResult.dimension === chosenDimension && (
           <ArchetypeResultSection
             archetype={archetypeResult}
             lang={lang}
@@ -657,13 +647,14 @@ export function Results() {
             <div className="text-sm">
               {isAdmin && isPreview ? (
                 <EditableField
-                  value={getContent(`results_email_sent${langKey}`, emailSentText)}
-                  onSave={(value) => saveContent(`results_email_sent${langKey}`, value)}
+                  key={`${emailMessageKey}_${messageLocale}`}
+                  value={emailSentText}
+                  onSave={value => savePresentation({...presentation,messages:{...presentation.messages,[emailMessageKey]:{...presentation.messages[emailMessageKey],[messageLocale]:value}}})}
                   as="span"
                   className="text-sm text-green-700"
                 />
               ) : (
-                session.email_status === 'sent' ? getContent(`results_email_sent${langKey}`, emailSentText) : emailSentText
+                emailSentText
               )}{' '}
               <strong>{session.email}</strong>
             </div>

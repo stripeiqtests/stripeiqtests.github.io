@@ -84,3 +84,11 @@ inspect that endpoint and signed delivery before treating it as configured.
 Official references: [Stripe fulfillment](https://docs.stripe.com/checkout/fulfillment),
 [Stripe webhook verification](https://docs.stripe.com/events/manage-webhook-endpoints),
 [Resend idempotency window](https://resend.com/docs/dashboard/emails/idempotency-keys).
+
+## Administrator presentation rules
+
+The follow-up `20261023073000_result_presentation.sql` is prepared but not applied.
+It exposes only the public presentation configuration, keeps existing saved email
+copy, and grants the worker read access to authored archetypes. Apply this approved
+migration before deploying the matching email/frontend candidates. See
+`ADMIN_RESULT_RULES.md` for current-result versus frozen-email behavior and defaults.

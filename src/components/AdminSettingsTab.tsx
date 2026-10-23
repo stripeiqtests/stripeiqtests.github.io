@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { AdminPresentationSettings } from './AdminPresentationSettings';
 import { supabase } from '../lib/supabase';
 import type { Test } from '../lib/supabase';
 import { Save, Check, Globe } from 'lucide-react';
@@ -96,6 +97,8 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
             <h2 className="text-xl font-bold text-gray-900">
                 {lang === 'ru' ? 'Настройки' : 'Settings'}
             </h2>
+
+            <AdminPresentationSettings />
 
             {/* Language Mode Setting */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">

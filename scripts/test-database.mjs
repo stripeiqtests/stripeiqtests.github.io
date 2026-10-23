@@ -52,7 +52,7 @@ select '11111111-1111-4111-8111-111111111111',n,'Fixture question '||n,
 const migrations = readdirSync(resolve(root, 'supabase/migrations')).filter(f => /^\d+_.+\.sql$/.test(f)).sort();
 writeFileSync(resolve(temp, 'run.sql'), '\\set ON_ERROR_STOP on\n' + platform + '\n'
   + migrations.map(file => `\\echo Applying ${file}\n\\i /migrations/${file}`).join('\n')
-  + '\n' + fixtures + '\n\\i /tests/security_rls.sql\n\\i /tests/storage_readiness.sql\n\\i /tests/audit_safety.sql\n\\i /tests/payment_fulfillment.sql\n\\i /tests/pinned_attempts.sql\n');
+  + '\n' + fixtures + '\n\\i /tests/security_rls.sql\n\\i /tests/storage_readiness.sql\n\\i /tests/audit_safety.sql\n\\i /tests/result_presentation.sql\n\\i /tests/payment_fulfillment.sql\n\\i /tests/pinned_attempts.sql\n');
 let created = false;
 try {
   docker(['run', '-d', '--name', container, '--label', `${ownerLabel}=${runId}`, '--network', 'none', '--memory', '512m', '--cpus', '1', '-e', 'POSTGRES_PASSWORD=isolated-fixture-only', '-e', 'POSTGRES_DB=app_test', `postgres:${postgresMajor}-alpine`], true);

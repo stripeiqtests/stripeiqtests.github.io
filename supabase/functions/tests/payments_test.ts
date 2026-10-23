@@ -8,6 +8,7 @@ import {
 import type { Database } from "../_shared/database.ts";
 import { createWebhookHandler } from "../stripe-webhook/handler.ts";
 import { deliverEmails, renderEmail } from "../_shared/email.ts";
+import { defaultPresentation } from "../_shared/presentation.ts";
 import { handler as emailHandler } from "../send-results-email/handler.ts";
 import { readBody } from "../_shared/http.ts";
 
@@ -403,16 +404,23 @@ Deno.test("email delivery freezes the stored authored archetype before retrying"
           is_paid: true,
           overall_score: 80,
           analyst_score: 90,
-          strategist_score: 70,
+          strategist_score: 90,
           observer_score: 60,
           intuitive_score: 50,
         }] as T;
       }
       if (table === "app_settings") {
-        return [{ value: "support@example.test" }] as T;
+        return [{ key: "support_contact", value: "support@example.test" }, {
+          key: "result_presentation",
+          value: JSON.stringify({
+            ...defaultPresentation(),
+            ties: "priority",
+            priority: ["strategist", "analyst", "observer", "intuitive"],
+          }),
+        }] as T;
       }
       assert.equal(table, "archetype_results");
-      assert.ok(query.startsWith("dimension=eq.analyst&"));
+      assert.ok(query.startsWith("dimension=eq.strategist&"));
       return [{
         title_ru: "Авторский заголовок",
         title_en: "Original title",
@@ -445,6 +453,7 @@ Deno.test("email delivery freezes the stored authored archetype before retrying"
     assert.equal(bodies[0], bodies[1]);
     const payload = JSON.parse(bodies[0]);
     assert.ok(payload.text.includes("**Исходный текст** <img src=x>"));
+    assert.ok(payload.text.includes("Ваша сильнейшая сторона — Стратег."));
     assert.ok(
       payload.html.includes(
         "<strong>Исходный текст</strong> &lt;img src=x&gt;",

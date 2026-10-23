@@ -1,3 +1,4 @@
+import { defaultPresentation, selectProfile, profileIntro, type Presentation } from '../../supabase/functions/_shared/presentation.ts';
 export interface DimensionScores {
   analyst_score: number | null;
   strategist_score: number | null;
@@ -19,20 +20,13 @@ export function getScoreInterpretation(score: number, lang: string): string {
 }
 
 export function leadingDimensions(scores: DimensionScores): string[] {
-  const entries = [
-    ['analyst', scores.analyst_score], ['strategist', scores.strategist_score],
-    ['observer', scores.observer_score], ['intuitive', scores.intuitive_score],
-  ].filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]));
-  const maximum = Math.max(0, ...entries.map(([, value]) => value));
-  return maximum > 0 ? entries.filter(([, value]) => value === maximum).map(([key]) => key) : [];
+  return selectProfile(scores).leaders;
 }
 
-export function getProfileDescription(scores: DimensionScores, lang: string): string {
-  const leaders = leadingDimensions(scores);
-  if (!leaders.length) return lang === 'ru' ? 'В этой попытке нет выраженного ведущего измерения.' : 'This attempt has no leading dimension.';
-  const names: Record<string, string> = lang === 'ru' ? { analyst: 'Аналитик', strategist: 'Стратег', observer: 'Наблюдатель', intuitive: 'Интуит' } : { analyst: 'Analyst', strategist: 'Strategist', observer: 'Observer', intuitive: 'Intuitive' };
-  const labels = leaders.map(key => names[key]).join(', ');
-  if (leaders.length > 1) return lang === 'ru' ? `Смешанный профиль: ${labels}.` : `Mixed profile: ${labels}.`;
+export function getProfileDescription(scores: DimensionScores, lang: string, policy: Presentation = defaultPresentation()): string {
+  const selection = selectProfile(scores, policy);
+  const intro = profileIntro(scores, lang, policy);
+  if (selection.kind !== 'single') return intro;
   // Preserve the published descriptions. The audit changes only which profile
   // is selected for zero/tied scores, not the author's interpretation text.
   const descriptions: Record<string, { ru: string; en: string }> = {
@@ -53,6 +47,5 @@ export function getProfileDescription(scores: DimensionScores, lang: string): st
       en: 'Your creative and associative thinking allows you to find unconventional solutions. Creative professions, innovation, and entrepreneurship are your calling.',
     },
   };
-  const prefix = lang === 'ru' ? `Ваша сильнейшая сторона — ${labels}. ` : `Your strongest dimension is ${labels}. `;
-  return prefix + descriptions[leaders[0]][lang === 'ru' ? 'ru' : 'en'];
+  return intro + ' ' + descriptions[selection.leaders[0]][lang === 'ru' ? 'ru' : 'en'];
 }

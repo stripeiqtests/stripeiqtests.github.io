@@ -9,6 +9,7 @@ import { trackPurchase } from '../lib/analytics';
 import { useContent } from '../lib/useContent';
 import { resultPath, storeSessionAccess } from '../lib/sessionAccess';
 import { SupportLink } from '../components/SupportLink';
+import { usePresentation } from '../lib/usePresentation';
 
 export function PaymentSuccess() {
   const [searchParams] = useSearchParams();
@@ -21,6 +22,7 @@ export function PaymentSuccess() {
   const verificationGeneration = useRef(0);
   const verificationRequest = useRef<{checkoutId:string;controller:AbortController}|null>(null);
   const { getContent, saveContent } = useContent();
+  const {presentation} = usePresentation();
   const contentKey = (name:string) => `${name}_${lang}`;
   const errorMessage=verificationFailed ? (lang === 'ru' ? 'Не удалось подтвердить статус. Если деньги списаны, не платите повторно: повторите проверку или обратитесь в поддержку.' : 'We could not confirm the status. If you were charged, do not pay again: retry verification or contact support.') : null;
 
@@ -161,7 +163,7 @@ export function PaymentSuccess() {
     <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          {lang === 'ru' ? 'Подтверждаем оплату' : 'Confirming payment'}
+          {presentation.messages.paymentConfirming[lang === 'ru' ? 'ru' : 'en']}
         </h1>
         <p className="text-gray-500 mb-4">
           {getContent(contentKey('payment_success_processing'), defaultProcessing)}

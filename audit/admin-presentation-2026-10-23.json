@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-23",
+  "status": "draft PR only; no production presentation migration, Edge or frontend deployment",
+  "authorization": "User approved proposed technical-state messages as defaults and requested administrator control of ambiguous cases.",
+  "controls": [
+    "global mixed-or-priority tie rule",
+    "explicit zero-result fallback, never for absent dimensions",
+    "per-language payment/email/none/mixed messages",
+    "preview, atomic save, staged defaults reset"
+  ],
+  "invariants": [
+    "scores/answers/prices and authored single-leader interpretations unchanged",
+    "browser and worker share one selection implementation",
+    "existing email payloads remain frozen for idempotent retries",
+    "non-admin writes denied; private settings remain hidden",
+    "invalid settings do not send guessed-profile email; profile loading is retryable"
+  ],
+  "validation": {
+    "affected_browser_passed": 20,
+    "edge_passed": 13,
+    "database": "PostgreSQL 17 chain/RLS/size/grants/concurrency and 11 encrypted backup/restore cases passed",
+    "axe": "expanded administrator priority/message form, no rules excluded, zero violations",
+    "lint": "passed",
+    "build": "passed; existing main-chunk size warning remains",
+    "security_rich_text_hosting": "passed",
+    "bundles": "4 prepared, not deployed"
+  },
+  "initial_test_adjustments": "New tests changed from exact label textContent lookup to accessible role/name for nested select/textarea labels; bilingual fixture explicitly enables bilingual mode.",
+  "migration": {
+    "path": "supabase/migrations/20261023073000_result_presentation.sql",
+    "sha256": "3d72b146dbc99db50c733c995f9f460520b2df021073e844ba1e9b022cab6a0c",
+    "applied": false
+  },
+  "bundles": {
+    "project": "afsoyuczexiztsjntkvi",
+    "deployed": false,
+    "functions": [
+      {
+        "name": "create-checkout",
+        "file": "create-checkout.js",
+        "verify_jwt": false,
+        "sha256": "046c8e7346ef8530e4ac7a2e0a67d54dd3f26da8e41d35495d979538ce7ab047",
+        "bytes": 6240
+      },
+      {
+        "name": "verify-payment",
+        "file": "verify-payment.js",
+        "verify_jwt": false,
+        "sha256": "08fd47f9df83913c30d8b0d2ed9707288cd78959e425a6eff31b41f753a96de4",
+        "bytes": 19013
+      },
+      {
+        "name": "send-results-email",
+        "file": "send-results-email.js",
+        "verify_jwt": false,
+        "sha256": "cc9efee4780cb197331ed282132afb3940555642a4193534b56c383d2a6fe612",
+        "bytes": 16472
+      },
+      {
+        "name": "stripe-webhook",
+        "file": "stripe-webhook.js",
+        "verify_jwt": false,
+        "sha256": "4aa15a6a702ca1bd56fd451285219bc38b63b877a2bea9d95dfdafafa13e43e9",
+        "bytes": 5595
+      }
+    ]
+  }
+}
