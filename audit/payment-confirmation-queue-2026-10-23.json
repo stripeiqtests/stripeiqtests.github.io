@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-23",
+  "scope": "Return-page verification must not wait for the mail provider",
+  "problem": "The browser request has a 20-second timeout, but after atomic payment fulfillment the handler awaited mail claiming, content reads, payload freeze, provider request and finalization. Slow mail could delay an already-unlocked result.",
+  "change": "Return confirmed capability/result immediately after fulfill_checkout commits access and durable email job. Only the private queue worker performs delivery, matching the existing signed-webhook path.",
+  "validation": {
+    "regression_before": "Failed: handler called claim_result_emails after fulfill_checkout",
+    "regression_after": "Passed: handler responds with the protected result, no-store header, exactly the fulfillment RPC and no mail claim; malformed checkout IDs never reach Stripe",
+    "edge_passed": 14,
+    "typecheck": "All four entry points passed",
+    "bundles": "Four regenerated, no deployment",
+    "lint": "passed"
+  },
+  "invariants": [
+    "Payment facts remain canonical Stripe server data",
+    "Access and email enqueue remain one database transaction",
+    "Email retries still use frozen payload and provider idempotency",
+    "Mail failure cannot delay or roll back paid access",
+    "No wording, price, scoring or stored results changed"
+  ],
+  "rollout": "Private worker/scheduler is mandatory before production release; not configured or enabled by this change.",
+  "bundles": {
+    "project": "afsoyuczexiztsjntkvi",
+    "deployed": false,
+    "functions": [
+      {
+        "name": "create-checkout",
+        "file": "create-checkout.js",
+        "verify_jwt": false,
+        "sha256": "046c8e7346ef8530e4ac7a2e0a67d54dd3f26da8e41d35495d979538ce7ab047",
+        "bytes": 6240
+      },
+      {
+        "name": "verify-payment",
+        "file": "verify-payment.js",
+        "verify_jwt": false,
+        "sha256": "ea64b329ae74e20fb58e894ea8af4a06f7d360a9984d2dae4ab5a3b27f3d2bae",
+        "bytes": 6341
+      },
+      {
+        "name": "send-results-email",
+        "file": "send-results-email.js",
+        "verify_jwt": false,
+        "sha256": "cc9efee4780cb197331ed282132afb3940555642a4193534b56c383d2a6fe612",
+        "bytes": 16472
+      },
+      {
+        "name": "stripe-webhook",
+        "file": "stripe-webhook.js",
+        "verify_jwt": false,
+        "sha256": "4aa15a6a702ca1bd56fd451285219bc38b63b877a2bea9d95dfdafafa13e43e9",
+        "bytes": 5595
+      }
+    ]
+  }
+}

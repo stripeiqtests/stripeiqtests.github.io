@@ -40,6 +40,8 @@ metadata; current editable test prices are not used to reject those payments.
   `https://afsoyuczexiztsjntkvi.supabase.co/functions/v1/stripe-webhook`, subscribed
   to `checkout.session.completed` and `checkout.session.async_payment_succeeded`.
 - Run the private email worker every few minutes, POST `{}` with its Bearer secret.
+  This is a release gate for both payment paths: verification and the webhook
+  commit paid access + outbox and return without contacting the mail provider.
   Store it in a root-readable environment file, not the public healthcheck/repository.
   The monitor/notification destination is not chosen yet; do not send messages.
 - Never paste real secret values into chat, source, shell history or screenshots.
@@ -71,6 +73,8 @@ inspect that endpoint and signed delivery before treating it as configured.
 
 - Database failure: webhook returns 503 for Stripe retry; no premature 200 success.
 - Email failure: paid access remains unlocked; persistent pending job retries.
+  The return-page handler does not wait for the mail provider, so a stalled
+  delivery cannot consume the browser verification timeout.
 - Worker crash: lease expires in 2 minutes. Provider requests use one frozen body
   and an idempotency key per job. Resend keys last 24h; automatic retries stop at
   8 attempts or before 23h. Old ambiguous sends require operator review.

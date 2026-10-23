@@ -6,6 +6,7 @@ import {
   paymentFacts,
 } from "../_shared/payments.ts";
 import type { Database } from "../_shared/database.ts";
+import { createVerificationHandler } from "../verify-payment/handler.ts";
 import { createWebhookHandler } from "../stripe-webhook/handler.ts";
 import { deliverEmails, renderEmail } from "../_shared/email.ts";
 import { defaultPresentation } from "../_shared/presentation.ts";
@@ -481,4 +482,50 @@ Deno.test("public callers cannot invoke the queue worker; JSON body is bounded",
       ),
     /too large/,
   );
+});
+
+Deno.test("payment confirmation commits access and outbox without waiting for email delivery", async () => {
+  Deno.env.set("RESEND_API_KEY", "fixture-only");
+  const calls: string[] = [];
+  let stripeReads = 0;
+  const stripe = stripeMock(() => {
+    stripeReads++;
+    return checkout();
+  });
+  const expected = {
+    success: true,
+    testSessionId: sessionId,
+    testId,
+    amountPaid: 200,
+    resultAccessToken: accessToken,
+    alreadyProcessed: false,
+  };
+  const db = dbStub((name) => {
+    calls.push(name);
+    if (name === "fulfill_checkout") return Promise.resolve(expected);
+    throw new Error("The private mail worker must own delivery");
+  });
+  const verify = createVerificationHandler(() => ({ db, stripe }));
+  const request = (body: unknown) =>
+    new Request("https://example.test/verify", {
+      method: "POST",
+      headers: { origin: "https://inner-code.me" },
+      body: JSON.stringify(body),
+    });
+  try {
+    assert.equal(
+      (await verify(request({ stripeSessionId: "invalid" }))).status,
+      400,
+    );
+    assert.equal(stripeReads, 0);
+    const response = await verify(
+      request({ stripeSessionId: "cs_test_fixture" }),
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Cache-Control"), "no-store");
+    assert.deepEqual(await response.json(), expected);
+    assert.deepEqual(calls, ["fulfill_checkout"]);
+  } finally {
+    Deno.env.delete("RESEND_API_KEY");
+  }
 });
