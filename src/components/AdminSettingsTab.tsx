@@ -138,7 +138,7 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
                             </p>
                         </div>
                         {languageMode === 'ru' && (
-                            <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                            <span className="text-xs text-green-800 bg-green-100 px-2 py-1 rounded">
                                 {lang === 'ru' ? 'По умолчанию' : 'Default'}
                             </span>
                         )}
@@ -199,6 +199,7 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
                             {lang === 'ru' ? 'Целевой тест' : 'Target Test'}
                         </label>
                         <select
+                            aria-label={lang==='ru'?'Целевой тест':'Target Test'}
                             value={followUpTestSlug}
                             onChange={(e) => setFollowUpTestSlug(e.target.value)}
                             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"

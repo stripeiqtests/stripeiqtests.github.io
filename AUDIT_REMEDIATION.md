@@ -45,7 +45,7 @@ hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 | A06 result recovery | Explicit private-link copy, blocked-storage fallback, queued email contains recovery link | Deploy queue; independent email-based recovery flow still open |
 | A07 false content/settings saves | Atomic upserts and surfaced failures; browser tests | Release |
 | A08 lost drafts | Expiring local drafts, pinned server attempt and restart UI; reload/ambiguous submission browser tests; schema applied | Frontend rollout |
-| A09 missing error states | Question schema validation, retry screens, ErrorBoundary; bounded Home fetch; result retry/storage tests and delayed earlier-result regression | Release |
+| A09 missing error states | Question schema validation, retry screens, ErrorBoundary; bounded Home/result/payment requests; stale result, checkout and verification response regressions | Release |
 | A10 admin validation | Price/options/correct answer/number validation, save locks and errors; image format/signature/decode/size/dimensions validated | Broader validation coverage and release |
 | A11 changing slug | Existing slug retained on title change; browser test | Release |
 | A12 live question mutation | Private immutable question/scoring/price versions; archive resume; SQL + browser tests, concurrent submission test; migration applied; real preview started/resumed the attempt and loaded all 21 questions | Release frontend; finish approved production submission smoke test |
@@ -55,7 +55,7 @@ hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 | A16 banner overlap | Consent in document flow; mobile browser test | Release |
 | A17 mobile entry | First-screen CTA/price, wider vertical card; mobile browser test | Release; broader device review |
 | A18 image questions | Native zoom dialog, load error/retry; browser modal/retry/Escape test passed | Release |
-| A19 accessibility | Language attribute, option/progress semantics, focus and contrast fixes | Full keyboard and contrast review |
+| A19 accessibility | Named controls, headings/landmarks, native password dialog, keyboard focus recovery; 15 screen states pass axe 4.14.0 without exclusions; compact confirmation controls retained | Manual gradient contrast, screen-reader and broader device review; release |
 | A20 monitoring | Existing free 6h read-only check remains | Storage/database coverage, staleness, chosen alert channel |
 | A21 backups | Not implemented | Encrypted DB + Storage backup and restore drill |
 | A22 schema/CI | Baseline, clean real PostgreSQL migration/RLS/scoring checks, browser/Edge deployment gates; full PR CI passed for 1eff085 including production-major and Edge bundle gates | Reconcile live migration history |
@@ -63,13 +63,14 @@ hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 | A24 anonymous abuse | Private attempt capability, bounded snapshot/answer sizes, UTC admission quotas, shared versions, abandoned-attempt cleanup; real anon/auth and concurrent SQL checks; schema applied | Frontend rollout and explicit legacy RPC cutover; monitor quota exhaustion; stronger bot controls remain open |
 | A25 security headers/logging | Capability log removed; no-store responses; sanitized logs; CSP/HSTS/frame/referrer headers verified on actual Cloudflare preview | Coordinate production hosting rollout |
 | A26 routes/metadata | Route titles, canonical/noindex; Cloudflare preview direct /privacy returns HTTP 200 and renders app under CSP | Live domain still uses GitHub Pages and returns 404 on direct routes; hosting rollout |
-| A27 duplicate analytics | Consent-gated purchase, stable SHA-256 transaction identifier | Result/payment browser scenarios, release |
-| A28 locale/support/demo | Public support configurable in admin; locale-preserving payment email; admin preview gated | Remaining missing translations and source question language |
+| A27 duplicate analytics | Consent-gated purchase, SHA-256 transaction ID; concurrent callbacks deduplicate even with blocked storage; broken providers cannot block checkout/answers; browser tests | Release |
+| A28 locale/support/demo | Public support configurable in admin; English mode survives blocked preference storage; settings label translated; preview now actually gated by administrator auth with browser tests | Remaining source question language and legacy copy review; release |
 | A29 upload/orphan quota | Format/signature/decode/size/dimension validation; cancel cleans only editor-owned uploads; saved/ambiguous writes preserved; 5 browser tests passed; upload limits applied | Release frontend; reference-aware GC review for old orphans |
 
 ## Validation already exercised
 
-- `pnpm test:browser`: all 27 tests passed, including pinned attempts/lost submission response, stale result requests and upload cleanup.
+- `pnpm test:browser`: all 43 tests passed, including pinned attempts/lost submission response, stale payment/result requests, preview authorization, locale, analytics and upload cleanup. 15 screen states had zero detected axe violations without rule/selector exclusions; incomplete gradient-contrast checks remain a manual review item. See `audit/accessibility-and-payment-ui-2026-10-23.json`.
+- A subsequent successful-payment fixture confirms protected-result navigation, the actual discounted amount in analytics and no duplicate purchase on a repeated return-page visit; all 12 affected payment/accessibility tests passed after adding it.
 - `pnpm lint`, `pnpm build`, `pnpm test:security`, `pnpm test:rich-text`, `pnpm test:hosting`: passed for this revision.
 - `deno check --config supabase/functions/deno.json` for all four payment/worker entry points passed.
 - `pnpm test:edge`: all 9 tests passed, including expired checkout recovery. No real payments/emails/network destinations used.
@@ -104,3 +105,15 @@ Preview `8bc006b7.inner-code-iq-test.pages.dev/privacy` was subsequently verifie
 HTTP 200; CSP with the correct inline-script hash, HSTS, no-referrer, SAMEORIGIN
 and noindex headers; the real app rendered and navigated home with no console
 errors/warnings in this read-only browser check. Production DNS has not changed.
+
+## Accessibility follow-up
+
+The browser suite uses the official `@axe-core/playwright` integration described
+in [Playwright's accessibility guide](https://playwright.dev/docs/accessibility-testing).
+No rules or selectors are excluded. Findings were fixed in the UI: labels,
+landmarks/headings, contrast, nested interactive paywall controls and keyboard
+focus after cancelling an inline edit. Tests also cover the administrator-only
+preview and changing preview routes. The unchanged compact confirmation layout
+is absolutely positioned, with reserved text padding and explicit dark editor text.
+Automated results supplement keyboard checks; they do not establish full WCAG
+conformance or replace the open manual gradient/screen-reader/device review.

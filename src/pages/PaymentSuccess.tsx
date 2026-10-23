@@ -14,23 +14,32 @@ export function PaymentSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [processing, setProcessing] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [verificationFailed, setVerificationFailed] = useState(false);
   const { lang } = useLanguage();
   const { isAdmin, authLoading } = useAdmin();
   const isPreview=isAdmin&&(searchParams.get('preview')==='admin'||searchParams.get('session_id')==='demo');
-  const verificationLock = useRef(false);
+  const verificationGeneration = useRef(0);
+  const verificationRequest = useRef<{checkoutId:string;controller:AbortController}|null>(null);
   const { getContent, saveContent } = useContent();
+  const errorMessage=verificationFailed ? (lang === 'ru' ? 'Не удалось подтвердить статус. Если деньги списаны, не платите повторно: повторите проверку или обратитесь в поддержку.' : 'We could not confirm the status. If you were charged, do not pay again: retry verification or contact support.') : null;
 
   const handlePaymentSuccess = useCallback(async (stripeSessionId: string) => {
-    if (verificationLock.current) return;
-    verificationLock.current = true;
-    setProcessing(true); setErrorMessage(null);
+    if(verificationRequest.current?.checkoutId===stripeSessionId)return;
+    const generation=++verificationGeneration.current;
+    verificationRequest.current?.controller.abort();
+    const controller=new AbortController();
+    verificationRequest.current={checkoutId:stripeSessionId,controller};
+    setProcessing(true); setVerificationFailed(false);
     try {
+      if(!/^cs_(test|live)_[A-Za-z0-9]+$/.test(stripeSessionId))throw new Error('Invalid checkout ID');
       // Call edge function to verify payment and update session
       const { data, error } = await supabase.functions.invoke('verify-payment', {
         body: { stripeSessionId },
+        signal:controller.signal,
+        timeout:20000,
       });
 
+      if(generation!==verificationGeneration.current||controller.signal.aborted)return;
       if (error) throw error;
 
       // Check if data contains an error message
@@ -39,7 +48,8 @@ export function PaymentSuccess() {
       }
 
       // Redirect to results page
-      if (data?.success && data?.testSessionId && data?.resultAccessToken) {
+      const validUuid=(value:unknown)=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+      if (data?.success===true && validUuid(data.testSessionId) && validUuid(data.resultAccessToken)) {
         storeSessionAccess(data.testSessionId, data.resultAccessToken);
         // Track successful purchase
         void trackPurchase(data.testId || '', data.amountPaid ?? 0, 'USD', stripeSessionId);
@@ -47,12 +57,12 @@ export function PaymentSuccess() {
       } else {
         throw new Error('No test session ID returned');
       }
-    } catch (err: unknown) {
-      void err;
-      setErrorMessage(lang === 'ru' ? 'Не удалось подтвердить статус. Если деньги списаны, не платите повторно: повторите проверку или обратитесь в поддержку.' : 'We could not confirm the status. If you were charged, do not pay again: retry verification or contact support.');
-      setProcessing(false);
-    } finally { verificationLock.current = false; }
-  }, [navigate, lang]);
+    } catch {
+      if(generation===verificationGeneration.current&&!controller.signal.aborted){
+        setVerificationFailed(true);setProcessing(false);
+      }
+    } finally { if(generation===verificationGeneration.current)verificationRequest.current=null; }
+  }, [navigate]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -69,12 +79,19 @@ export function PaymentSuccess() {
 
     if (sessionId) {
       // Start an external payment verification; the loading state is also used by retry.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       void handlePaymentSuccess(sessionId);
     } else {
       navigate('/');
     }
   }, [handlePaymentSuccess, searchParams, navigate, isAdmin, authLoading, isPreview]);
+
+  // Leaving/changing the return URL invalidates its response, including a slow
+  // successful verification for a checkout the visitor is no longer viewing.
+  useEffect(()=>()=>{
+    verificationGeneration.current++;
+    verificationRequest.current?.controller.abort();
+    verificationRequest.current=null;
+  },[searchParams,isPreview]);
 
   const defaultTitle = lang === 'ru' ? 'Оплата прошла успешно!' : 'Payment Successful!';
   const defaultProcessing = lang === 'ru' ? 'Обрабатываем ваши результаты...' : 'Processing your results...';
@@ -83,7 +100,7 @@ export function PaymentSuccess() {
   // Admin preview mode - show editable content (or static preview if not logged in)
   if (!authLoading && isPreview) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
@@ -123,8 +140,9 @@ export function PaymentSuccess() {
 
   if (!processing) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
+          <h1 className="text-xl font-bold text-gray-900 mb-3">{lang==='ru'?'Не удалось подтвердить оплату':'Could not confirm payment'}</h1>
           <p className="text-gray-500 mb-4">
             {isAdmin ? (
               <EditableField
@@ -138,7 +156,7 @@ export function PaymentSuccess() {
             )}
           </p>
           {errorMessage && (
-            <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{errorMessage}</p>
+            <p role="alert" className="text-red-800 text-sm bg-red-50 p-3 rounded-lg">{errorMessage}</p>
           )}
           <button className="my-4 rounded-lg bg-indigo-600 px-5 py-3 text-white" onClick={() => void handlePaymentSuccess(searchParams.get('session_id') ?? '')}>{lang === 'ru' ? 'Повторить проверку' : 'Retry verification'}</button>
           <p><SupportLink /></p>
@@ -148,7 +166,7 @@ export function PaymentSuccess() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
           {lang === 'ru' ? 'Подтверждаем оплату' : 'Confirming payment'}

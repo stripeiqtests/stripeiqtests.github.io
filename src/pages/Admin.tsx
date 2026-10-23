@@ -28,6 +28,7 @@ export function Admin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const passwordDialog=useRef<HTMLDialogElement|null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordUpdateError, setPasswordUpdateError] = useState('');
@@ -308,7 +309,7 @@ export function Admin() {
   // Login form
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-8">
             <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -368,12 +369,12 @@ export function Admin() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <Link to="/" className="text-gray-500 hover:text-gray-700">
+            <Link to="/" aria-label={t('admin.back_home')} className="text-gray-500 hover:text-gray-700">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div className="flex items-center gap-2">
               <Brain className="w-6 h-6 text-indigo-600" />
-              <span className="font-bold text-gray-900">{t('admin.panel')}</span>
+              <h1 className="font-bold text-gray-900">{t('admin.panel')}</h1>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -402,12 +403,12 @@ export function Admin() {
       </header>
 
       {showPasswordDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
+          <dialog
+            ref={node=>{passwordDialog.current=node;if(node&&!node.open)node.showModal();}}
             aria-labelledby="password-dialog-title"
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            onClose={()=>setShowPasswordDialog(false)}
+            onCancel={event=>{if(passwordUpdating)event.preventDefault();}}
+            className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white p-6 shadow-xl backdrop:bg-black/40"
           >
             <div className="mb-5 flex items-center justify-between gap-4">
               <h2 id="password-dialog-title" className="text-xl font-semibold text-gray-900">
@@ -416,8 +417,9 @@ export function Admin() {
               <button
                 type="button"
                 aria-label={t('admin.cancel')}
-                onClick={() => setShowPasswordDialog(false)}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                disabled={passwordUpdating}
+                onClick={() => passwordDialog.current?.close()}
+                className="rounded-lg p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-800"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -426,6 +428,7 @@ export function Admin() {
             <form onSubmit={handlePasswordUpdate} className="space-y-4">
               <input
                 type="password"
+                aria-label={t('admin.new_password')}
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
                 placeholder={t('admin.new_password')}
@@ -435,6 +438,7 @@ export function Admin() {
               />
               <input
                 type="password"
+                aria-label={t('admin.confirm_password')}
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 placeholder={t('admin.confirm_password')}
@@ -452,7 +456,8 @@ export function Admin() {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowPasswordDialog(false)}
+                  disabled={passwordUpdating}
+                  onClick={() => passwordDialog.current?.close()}
                   className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
                 >
                   {t('admin.cancel')}
@@ -466,8 +471,7 @@ export function Admin() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+          </dialog>
       )}
 
       <main className="max-w-6xl mx-auto px-4 py-8">
@@ -600,7 +604,7 @@ export function Admin() {
                           </button>
                           <button
                             onClick={() => setEditingTest(test.id)}
-                            className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="p-2 text-gray-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
                             title={t('admin.edit')}
                           >
                             <Edit2 className="w-5 h-5" />
@@ -608,7 +612,7 @@ export function Admin() {
                           <button
                             disabled={pendingAction}
                             onClick={() => archiveTest(test)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-2 text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                             title={test.archived_at ? (lang === 'ru' ? 'Восстановить из архива' : 'Restore from archive') : (lang === 'ru' ? 'Архивировать тест' : 'Archive test')}
                           >
                             <span className="text-xs font-medium">{test.archived_at ? (lang === 'ru' ? 'Вернуть' : 'Restore') : (lang === 'ru' ? 'В архив' : 'Archive')}</span>
@@ -1032,6 +1036,7 @@ function QuestionForm({
           <input
             type="text"
             value={imageUrl}
+            aria-label={t('admin.image_url')}
             onChange={(e) => setImageUrl(e.target.value)}
             placeholder="https://..."
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
@@ -1039,14 +1044,14 @@ function QuestionForm({
         ) : (
           /* File Upload */
           <div className="flex items-center gap-2">
-            <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 focus-within:ring-2 focus-within:ring-indigo-600 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/gif,image/webp"
                 aria-label={lang==='ru'?'Загрузить изображение':'Upload image'}
                 onChange={handleImageUpload}
                 disabled={uploading}
-                className="hidden"
+                className="sr-only"
               />
               {uploading ? (
                 <>
@@ -1079,6 +1084,7 @@ function QuestionForm({
               <span className="text-sm font-medium w-6">{opt.label}:</span>
               <input
                 type="text"
+                aria-label={`${t('admin.options')}: ${opt.label}`}
                 value={opt.value}
                 onChange={(e) => {
                   const newOptions = [...options];

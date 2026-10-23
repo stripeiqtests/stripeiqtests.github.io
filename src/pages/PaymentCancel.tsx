@@ -27,7 +27,7 @@ export function PaymentCancel() {
   const defaultHomeButton = lang === 'ru' ? 'На главную' : 'Back to Home';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
         <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
         <h1 className="text-2xl font-bold text-gray-900 mb-2">

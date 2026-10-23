@@ -17,11 +17,11 @@ export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [searchParams] = useSearchParams();
   const { t, lang } = useLanguage();
-  const { isAdmin } = useAdmin();
+  const { isAdmin,authLoading } = useAdmin();
   const { getContent, saveContent } = useContent();
 
   // Preview mode check
-  const isPreview = searchParams.get('preview') === 'admin';
+  const isPreview = isAdmin && searchParams.get('preview') === 'admin';
   const isPaywallPreview = sessionId === 'preview-paywall' && isPreview;
 
   // Mock data for results preview mode (paid)
@@ -68,19 +68,16 @@ export function Results() {
     created_at: new Date().toISOString(),
   };
 
-  const getInitialSession = () => {
-    if (isPaywallPreview) return mockPaywallSession;
-    if (isPreview) return mockSession;
-    return null;
-  };
-
-  const [session, setSession] = useState<TestSession | null>(getInitialSession());
-  const [test, setTest] = useState<Test | null>(isPreview || isPaywallPreview ? mockTest : null);
-  const [loading, setLoading] = useState(!isPreview && !isPaywallPreview);
+  const [loadedSession, setSession] = useState<TestSession | null>(null);
+  const [loadedTest, setTest] = useState<Test | null>(null);
+  const session=isPreview?(isPaywallPreview?mockPaywallSession:mockSession):loadedSession;
+  const test=isPreview?mockTest:loadedTest;
+  const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [archetypeResult, setArchetypeResult] = useState<ArchetypeResult | null>(null);
   const [followUpTestSlug, setFollowUpTestSlug] = useState<string | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [loadedAccessToken, setAccessToken] = useState<string | null>(null);
+  const accessToken=isPreview?null:loadedAccessToken;
   const [accessError, setAccessError] = useState<'missing-token' | 'network' | 'missing' | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [showPersonalLink, setShowPersonalLink] = useState(false);
@@ -92,14 +89,14 @@ export function Results() {
   }, []);
 
   useEffect(() => {
-    if (sessionId && !isPreview) {
+    if (!authLoading && sessionId && !isPreview) {
       loadSession();
     }
     // This is a request generation counter, not a DOM ref. Invalidate any
     // request still in flight when the route changes or the component unmounts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     return ()=>{sessionRequest.current++;};
-  }, [sessionId, isPreview]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId, isPreview,authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadFollowUpTestSlug() {
     const { data: settingsData } = await supabase
@@ -203,6 +200,7 @@ export function Results() {
 
   async function handlePayment() {
     if (!session || !test || !accessToken || processingPayment) return;
+    const request=sessionRequest.current;
 
     setProcessingPayment(true);
     setPaymentError(false);
@@ -218,8 +216,10 @@ export function Results() {
           accessToken,
           language:lang,
         },
+        timeout:20000,
       });
 
+      if(request!==sessionRequest.current)return;
       if (error) throw error;
 
       // Redirect to Stripe checkout
@@ -227,16 +227,14 @@ export function Results() {
       const checkoutUrl = new URL(data.url);
       if (checkoutUrl.protocol !== 'https:' || checkoutUrl.hostname !== 'checkout.stripe.com') throw new Error('Invalid checkout URL');
       window.location.href = checkoutUrl.href;
-    } catch (err) {
-      void err;
-      setPaymentError(true);
-      setProcessingPayment(false);
+    } catch {
+      if(request===sessionRequest.current){setPaymentError(true);setProcessingPayment(false);}
     }
   }
 
-  if (loading) {
+  if (authLoading || (!isPreview&&loading)) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="mt-4 text-gray-500">{t('common.loading')}</p>
@@ -245,9 +243,9 @@ export function Results() {
     );
   }
 
-  if (!session || accessError) {
+  if (!session || (!isPreview&&accessError)) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
           <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
@@ -272,7 +270,7 @@ export function Results() {
   // Payment required
   if (!session.is_paid) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
           {paymentError && <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-red-800"><p>{lang === 'ru' ? 'Не удалось открыть оплату. Попробуйте ещё раз.' : 'Could not open checkout. Please retry.'}</p><SupportLink /></div>}
           {/* Language Switcher */}
@@ -337,13 +335,13 @@ export function Results() {
               <EditableField
                 value={getContent(lang === 'ru' ? 'paywall_includes_title_ru' : 'paywall_includes_title_en', lang === 'ru' ? 'Внутри полного результата:' : 'Inside your full results:')}
                 onSave={(value) => saveContent(lang === 'ru' ? 'paywall_includes_title_ru' : 'paywall_includes_title_en', value)}
-                as="h3"
+                as="h2"
                 className="font-medium text-gray-900 mb-4"
               />
             ) : (
-              <h3 className="font-medium text-gray-900 mb-4">
+              <h2 className="font-medium text-gray-900 mb-4">
                 {getContent(lang === 'ru' ? 'paywall_includes_title_ru' : 'paywall_includes_title_en', lang === 'ru' ? 'Внутри полного результата:' : 'Inside your full results:')}
-              </h3>
+              </h2>
             )}
             <ul className="space-y-3 text-sm text-gray-700">
               <li className="flex items-start gap-2">
@@ -426,7 +424,14 @@ export function Results() {
           </div>
 
           {/* Payment Button */}
-          <button
+          {isPaywallPreview ? <div className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-4 rounded-xl font-medium">
+            <CreditCard className="w-5 h-5" />
+            <EditableField
+              value={getContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', lang === 'ru' ? 'Разблокировать мой результат' : 'Unlock My Results')}
+              onSave={value=>saveContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en',value)}
+              as="span" className="text-white"
+            />
+          </div> : <button
             onClick={handlePayment}
             disabled={processingPayment || isPaywallPreview}
             className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-4 rounded-xl font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
@@ -439,21 +444,12 @@ export function Results() {
             ) : (
               <>
                 <CreditCard className="w-5 h-5" />
-                {isAdmin && isPaywallPreview ? (
-                  <EditableField
-                    value={getContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', lang === 'ru' ? 'Разблокировать мой результат' : 'Unlock My Results')}
-                    onSave={(value) => saveContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', value)}
-                    as="span"
-                    className="text-white"
-                  />
-                ) : (
-                  getContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', lang === 'ru' ? 'Разблокировать мой результат' : 'Unlock My Results')
-                )}
+                {getContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', lang === 'ru' ? 'Разблокировать мой результат' : 'Unlock My Results')}
               </>
             )}
-          </button>
+          </button>}
 
-          <p className="text-xs text-gray-400 text-center mt-4">
+          <p className="text-xs text-gray-600 text-center mt-4">
             {lang === 'ru' ? 'Безопасная оплата через Stripe' : 'Secure payment powered by Stripe'}
           </p>
 
@@ -491,7 +487,7 @@ export function Results() {
   const intuitiveDesc = lang === 'ru' ? 'Креативность, ассоциативное мышление' : 'Creativity, associative thinking';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-8 px-4">
+    <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
         {session.is_paid && accessToken && <section className="mb-6 rounded-xl border border-indigo-200 bg-white p-4 print:hidden">
           <p className="mb-3 text-sm text-gray-700">{lang === 'ru' ? 'Сохраните персональную ссылку, чтобы вернуться к результату. Ссылка даёт доступ к вашему результату — храните её для себя.' : 'Save your personal link to return to this result. Anyone with this link can open your result; keep it private.'}</p>
@@ -634,11 +630,11 @@ export function Results() {
             <EditableField
               value={getContent(`results_profile_heading${langKey}`, profileHeading)}
               onSave={(value) => saveContent(`results_profile_heading${langKey}`, value)}
-              as="h3"
+              as="h2"
               className="text-lg font-semibold text-gray-900 mb-4"
             />
           ) : (
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{getContent(`results_profile_heading${langKey}`, profileHeading)}</h3>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">{getContent(`results_profile_heading${langKey}`, profileHeading)}</h2>
           )}
           <p className="text-gray-600 leading-relaxed">
             {getProfileDescription(session, lang)}
@@ -725,7 +721,7 @@ function DimensionCard({
   return (
     <div className={`rounded-xl border-2 p-6 ${colorClasses[color]}`}>
       <div className="flex justify-between items-start mb-2">
-        <h4 className="font-semibold text-gray-900">{title}</h4>
+        <h2 className="font-semibold text-gray-900">{title}</h2>
         <span className={`text-2xl font-bold ${textClasses[color]}`}>
           {score === null ? '—' : `${Math.round(score)}%`}
         </span>

@@ -26,13 +26,17 @@ export function EditableField({
     const [saveError, setSaveError] = useState<string | null>(null);
     const [isHovered, setIsHovered] = useState(false);
     const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+    const editButtonRef=useRef<HTMLButtonElement>(null);
+    const wasEditing=useRef(false);
     const hasChanges = editValue !== value;
+    const editLabel=`${t('admin.edit')}: ${value.slice(0,80)}`;
 
     useEffect(() => {
         if (isEditing && inputRef.current) {
             inputRef.current.focus();
             inputRef.current.select();
-        }
+        } else if(wasEditing.current)editButtonRef.current?.focus({preventScroll:true});
+        wasEditing.current=isEditing;
     }, [isEditing]);
 
     const handleSave = async () => {
@@ -66,7 +70,7 @@ export function EditableField({
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (isSaving) return;
-        if (e.key === 'Enter' && !multiline) {
+        if (e.key === 'Enter' && (!multiline || e.ctrlKey || e.metaKey)) {
             e.preventDefault();
             void handleSave();
         }
@@ -93,24 +97,26 @@ export function EditableField({
             <div className="relative inline-block w-full min-w-0 align-top" aria-busy={isSaving}>
                 {multiline ? (
                     <textarea
+                        aria-label={editLabel}
                         ref={inputRef as React.RefObject<HTMLTextAreaElement>}
                         value={editValue}
                         onChange={(e) => { setEditValue(e.target.value); setSaveError(null); }}
                         onKeyDown={handleKeyDown}
                         className={inputClasses}
-                        style={{ paddingRight: '5rem' }}
+                        style={{ paddingRight: '5rem',color:'#111827',backgroundColor:'#fff' }}
                         rows={3}
                         disabled={isSaving}
                     />
                 ) : (
                     <input
+                        aria-label={editLabel}
                         ref={inputRef as React.RefObject<HTMLInputElement>}
                         type="text"
                         value={editValue}
                         onChange={(e) => { setEditValue(e.target.value); setSaveError(null); }}
                         onKeyDown={handleKeyDown}
                         className={inputClasses}
-                        style={{ paddingRight: '5rem' }}
+                        style={{ paddingRight: '5rem',color:'#111827',backgroundColor:'#fff' }}
                         disabled={isSaving}
                     />
                 )}
@@ -157,12 +163,15 @@ export function EditableField({
                 {value}
             </Component>
             <button
+                ref={editButtonRef}
+                type="button"
+                aria-label={editLabel}
                 className={`p-2 rounded-lg border-2 transition-all cursor-pointer ${isHovered
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg'
-                    : 'bg-transparent text-indigo-500 border-indigo-300 hover:border-indigo-500'
+                    : 'bg-white text-indigo-700 border-indigo-300 hover:border-indigo-500'
                     }`}
-                onClick={() => { setEditValue(value); setSaveError(null); setIsEditing(true); }}
-                title="Click to edit"
+                onClick={event => { event.stopPropagation();setEditValue(value); setSaveError(null); setIsEditing(true); }}
+                title={t('admin.edit')}
             >
                 <Edit2 className="w-4 h-4" />
             </button>

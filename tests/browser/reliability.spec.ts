@@ -55,14 +55,14 @@ test('malformed options show a recoverable error instead of crashing', async ({ 
 test('new content really persists; failure keeps the editor draft', async ({ page, api }) => {
   await login(page); await page.goto('/');
   const card = page.locator('section').first().locator('.grid > div').nth(2);
-  await card.getByTitle('Click to edit').first().click();
+  await card.getByRole('button',{name:/^Редактировать:/}).first().click();
   await card.locator('input').fill('Сохранённый заголовок');
   await card.getByRole('button', { name: 'Сохранить', exact: true }).click();
   await expect(card.getByRole('heading', { name: 'Сохранённый заголовок' })).toBeVisible();
   expect(Object.values(api.content)).toContain('Сохранённый заголовок');
   await page.reload();
   await expect(card.getByRole('heading', { name: 'Сохранённый заголовок' })).toBeVisible();
-  await card.getByTitle('Click to edit').first().click();
+  await card.getByRole('button',{name:/^Редактировать:/}).first().click();
   await card.locator('input').fill('Несохранённый черновик'); api.failWrites = true;
   await card.getByRole('button', { name: 'Сохранить', exact: true }).click();
   await expect(card.getByRole('alert')).toBeVisible();

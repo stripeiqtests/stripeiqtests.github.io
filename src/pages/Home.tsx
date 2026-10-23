@@ -120,6 +120,7 @@ export function Home() {
         </div>
       </header>
 
+      <main>
       {/* Hero Section */}
       <section className="max-w-6xl mx-auto px-4 py-8 md:py-16 text-center">
         <EditableField
@@ -151,7 +152,7 @@ export function Home() {
             <EditableField
               value={feature1Title}
               onSave={(value) => saveContent(lang === 'ru' ? 'feature1_title_ru' : 'feature1_title_en', value)}
-              as="h3"
+              as="h2"
               className="font-semibold text-gray-900 mb-2"
             />
             <EditableField
@@ -166,7 +167,7 @@ export function Home() {
             <EditableField
               value={feature2Title}
               onSave={(value) => saveContent(lang === 'ru' ? 'feature2_title_ru' : 'feature2_title_en', value)}
-              as="h3"
+              as="h2"
               className="font-semibold text-gray-900 mb-2"
             />
             <EditableField
@@ -181,7 +182,7 @@ export function Home() {
             <EditableField
               value={feature3Title}
               onSave={(value) => saveContent(lang === 'ru' ? 'feature3_title_ru' : 'feature3_title_en', value)}
-              as="h3"
+              as="h2"
               className="font-semibold text-gray-900 mb-2"
             />
             <EditableField
@@ -196,7 +197,7 @@ export function Home() {
             <EditableField
               value={feature4Title}
               onSave={(value) => saveContent(lang === 'ru' ? 'feature4_title_ru' : 'feature4_title_en', value)}
-              as="h3"
+              as="h2"
               className="font-semibold text-gray-900 mb-2"
             />
             <EditableField
@@ -218,7 +219,7 @@ export function Home() {
               <EditableField
                 value={methodologyTitle}
                 onSave={(value) => saveContent(lang === 'ru' ? 'methodology_title_ru' : 'methodology_title_en', value)}
-                as="span"
+                as="h2"
                 className="font-semibold text-gray-900"
               />
             </div>
@@ -240,7 +241,7 @@ export function Home() {
                 <EditableField
                   value={methodSub1Title}
                   onSave={(value) => saveContent(lang === 'ru' ? 'method_sub1_title_ru' : 'method_sub1_title_en', value)}
-                  as="h4"
+                  as="h3"
                   className="font-semibold text-gray-900 flex items-center gap-2"
                 />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
@@ -261,7 +262,7 @@ export function Home() {
                 <EditableField
                   value={methodSub2Title}
                   onSave={(value) => saveContent(lang === 'ru' ? 'method_sub2_title_ru' : 'method_sub2_title_en', value)}
-                  as="h4"
+                  as="h3"
                   className="font-semibold text-gray-900 flex items-center gap-2"
                 />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
@@ -282,7 +283,7 @@ export function Home() {
                 <EditableField
                   value={methodSub3Title}
                   onSave={(value) => saveContent(lang === 'ru' ? 'method_sub3_title_ru' : 'method_sub3_title_en', value)}
-                  as="h4"
+                  as="h3"
                   className="font-semibold text-gray-900 flex items-center gap-2"
                 />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
@@ -303,7 +304,7 @@ export function Home() {
                 <EditableField
                   value={methodSub4Title}
                   onSave={(value) => saveContent(lang === 'ru' ? 'method_sub4_title_ru' : 'method_sub4_title_en', value)}
-                  as="h4"
+                  as="h3"
                   className="font-semibold text-gray-900 flex items-center gap-2"
                 />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
@@ -324,7 +325,7 @@ export function Home() {
                 <EditableField
                   value={methodSub5Title}
                   onSave={(value) => saveContent(lang === 'ru' ? 'method_sub5_title_ru' : 'method_sub5_title_en', value)}
-                  as="h4"
+                  as="h3"
                   className="font-semibold text-gray-900 flex items-center gap-2"
                 />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
@@ -407,6 +408,7 @@ export function Home() {
       </section>
 
       {/* Footer */}
+      </main>
       <footer className="bg-white border-t border-gray-100 py-8">
         <div className="max-w-6xl mx-auto px-4 text-center">
           <EditableField

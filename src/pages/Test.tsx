@@ -188,7 +188,7 @@ export function Test() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="mt-4 text-gray-500">{t('common.loading')}</p>
@@ -202,7 +202,7 @@ export function Test() {
 
   if (showEmailPrompt && allAnswered) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md" aria-busy={submitting}>
           <div className="text-center mb-8">
             <Brain className="w-16 h-16 text-indigo-600 mx-auto mb-4" />
@@ -229,7 +229,7 @@ export function Test() {
               placeholder="your@email.com"
               className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-gray-600 mt-2">
               {t('common.email_hint')}
             </p>
           </div>
@@ -270,7 +270,7 @@ export function Test() {
 
   if (loadError || !test || questions.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="max-w-md rounded-2xl border border-amber-200 bg-white p-8 text-center shadow-sm">
           <Brain className="mx-auto mb-4 h-12 w-12 text-amber-500" />
           <h1 className="text-xl font-bold text-gray-900">
@@ -302,14 +302,6 @@ export function Test() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-      {/* Progress Bar */}
-      <div className="fixed top-0 left-0 right-0 h-1 bg-gray-200 z-20" role="progressbar" aria-label={lang === 'ru' ? 'Отвечено вопросов' : 'Questions answered'} aria-valuemin={0} aria-valuemax={questions.length} aria-valuenow={answeredCount}>
-        <div
-          className="h-full bg-indigo-600 transition-all duration-300"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
@@ -325,6 +317,9 @@ export function Test() {
 
       {/* Question */}
       <main className="max-w-4xl mx-auto px-4 py-8">
+        <div className="fixed top-0 left-0 right-0 h-1 bg-gray-200 z-20" role="progressbar" aria-label={lang === 'ru' ? 'Отвечено вопросов' : 'Questions answered'} aria-valuemin={0} aria-valuemax={questions.length} aria-valuenow={answeredCount}>
+          <div className="h-full bg-indigo-600 transition-all duration-300" style={{ width: `${progress}%` }} />
+        </div>
         {resumed && <div role="status" className="mb-4 flex flex-wrap justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900"><span>{lang === 'ru' ? 'Сохранённые ответы восстановлены.' : 'Your saved answers have been restored.'}</span><button onClick={restart} className="text-indigo-800 underline">{lang === 'ru' ? 'Начать заново' : 'Start again'}</button></div>}
         {!canPersist && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-amber-900">{lang === 'ru' ? 'Браузер не разрешает сохранять черновик. Не закрывайте страницу до завершения теста.' : 'Draft storage is disabled. Keep this page open until you finish.'}</p>}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-8">
@@ -336,9 +331,9 @@ export function Test() {
           </div>
 
           {/* Question Text */}
-          <h2 ref={questionHeading} tabIndex={-1} className="text-xl text-gray-900 mb-6 whitespace-pre-line focus:outline-none">
+          <h1 ref={questionHeading} tabIndex={-1} className="text-xl text-gray-900 mb-6 whitespace-pre-line focus:outline-none">
             {currentQuestion.question_text.replace(/\\n/g, '\n')}
-          </h2>
+          </h1>
 
           {questionImageUrls.length > 0 && (
             <div className="mb-6 space-y-4">
