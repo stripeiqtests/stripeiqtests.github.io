@@ -1,4 +1,4 @@
-# Audit remediation вЂ” 2026-10-22
+# Audit remediation Р Р†Р вЂљРІР‚Сњ 2026-10-22
 
 Working branch: `fix/audit-reliability`. A local passing check is not a production release.
 The original 29-item technical audit remains the scope; unfinished items are listed below.
@@ -65,7 +65,7 @@ The matched frontend and functions are still pending release. See
 | A17 mobile entry | First-screen CTA/price, wider vertical card; mobile browser test | Release; broader device review |
 | A18 image questions | Native zoom dialog, load error/retry; browser modal/retry/Escape test passed | Release |
 | A19 accessibility | Named controls, headings/landmarks, native password dialog, keyboard focus recovery; 17 screen states pass axe 4.14.0 without exclusions, including bilingual payment previews; language button names include visible RU/EN; compact confirmation controls retained | Manual gradient contrast, screen-reader and broader device review; release |
-| A20 monitoring | Existing Cloudflare Worker updated for 6h read-only checks, persisted KV freshness and compatible public status URL; 13 isolated scheduler scenarios and real local read-only preflight passed; no VPS dependency in target architecture | Verify actual Cloudflare scheduled health run, then disable only old IQ Tests VPS timer; external alerts/watchdog remain open; empty Storage skips object download |
+| A20 monitoring | Existing Cloudflare Worker updated for 6h read-only checks, persisted KV freshness and compatible public status URL; 14 isolated scheduler cases and exact-bundle workerd checks passed; real Cloudflare health run succeeded with 3ms CPU; compatible status returns200; IQ VPS timer disabled/inactive and Telegraph services remain active | Existing UptimeRobot polling observed, alert destination/delivery unverified; empty Storage skips object download |
 | A21 backups | Read-only PostgreSQL/Storage exporter, age encryption, safe verified extraction, portable manual operator workflow (shared VPS excluded); 11 tests including real PostgreSQL 17 restore and fixture Storage bytes | Operator-owned keys/credentials, first live encrypted off-site copy and isolated hosted Auth/Storage restore drill; retention/staleness alerts |
 | A22 schema/CI | Baseline, clean real PostgreSQL migration/RLS/scoring checks, browser/Edge deployment gates; full PR CI passed for a4c468b with 44 browser tests; maintained Actions and Pages artifact build passed, review-branch deploy was skipped; removed duplicate push/PR validation starts | Reconcile live migration history |
 | A23 dependency advisories | Compatible dependency updates, DOMPurify 3.4.17; pnpm audit reports zero advisories; maintained Node 24 Actions pinned to release commit SHAs, stable Ubuntu image and build-only review-branch runs | Release; track deprecated ESLint 9 separately |
@@ -143,3 +143,18 @@ preview and changing preview routes. The unchanged compact confirmation layout
 is absolutely positioned, with reserved text padding and explicit dark editor text.
 Automated results supplement keyboard checks; they do not establish full WCAG
 conformance or replace the open manual gradient/screen-reader/device review.
+
+## Cloudflare cutover follow-up
+
+The user rejected the shared Telegraph VPS for IQ Tests. The existing Cloudflare
+Worker now runs six-hour real read-only health checks and persists freshness.
+The separately approved temporary probe exposed a Workers-only redirect API
+incompatibility; it was corrected and added to an exact-bundle workerd gate with
+fully mocked outbound requests. A real scheduled run then passed at 08:59:08 UTC
+on 2026-10-23 (3ms CPU). The minute Cron was removed; a worker-side expiry also
+prevents delayed probe events from performing work beyond ten minutes. Public
+health returned HTTP200. Only the IQ VPS timer was disabled; both Telegraph
+services remained active. Mail scheduling is implemented on Cloudflare but stays
+disabled until the matching private function/secret and controlled test pass.
+No new payment, result, email or authored-copy changes occurred in this cutover.
+See `audit/monitoring-cloudflare-2026-10-23.json`.

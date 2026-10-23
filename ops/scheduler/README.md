@@ -6,9 +6,14 @@ has the `inner-code-iq-test` Pages project and an older scheduled health Worker.
 Do not create a duplicate or use the global CLI token for the unrelated account
 `d08aef3b51fc374db9c4eb76f63ac3f3`.
 
-Status: replacement deployed as version `9a75324d-e1b7-462d-befa-d8ba60126666`;
-real scheduled health verification and VPS cutover pending. The matching private
-mail function has not been released; mail remains disabled.
+Status: replacement deployed as version `8e34c58b-9552-4bd2-88c2-b0f1ee8ddab5`.
+A real Cloudflare scheduled health run passed at 08:59:08 UTC on 2026-10-23
+(11:59:08 Europe/Minsk), persisted in KV, 3 ms CPU. Public status returns 200.
+The old IQ Tests VPS timer is disabled/inactive; Telegraph services stay active.
+Temporary minute scheduling was removed; stale probe invocations stop doing work
+after their ten-minute window even during Cron propagation. The matching private
+mail function has not been released; mail remains disabled. See
+`audit/monitoring-cloudflare-2026-10-23.json`.
 
 ## Schedule and boundaries
 
@@ -26,9 +31,9 @@ mail function has not been released; mail remains disabled.
   preserves last success and fails the invocation. Partial mail delivery records
   `retry_pending`, not green success. The existing public `/health/supabase` GET/HEAD URL reports only cached health
   freshness (200/503). It cannot run SQL or send email; other paths return 404.
-- No automatic resume, upgrades, notifications or payments. Alert destination
-  and an independent watchdog remain unconfigured. A stopped scheduler cannot
-  alert about its own failure; inspect report age externally.
+- No automatic resume, upgrades, notifications or payments. An existing UptimeRobot monitor was observed polling the preserved health URL.
+  Its alert destination and delivery have not been verified. A stopped scheduler
+  cannot alert about its own failure; the URL returns 503 when its report ages.
 
 This uses two of Workers Free's five account Cron Triggers. At most 724 KV writes
 per day fit the current free 1,000/day quota, **shared with other account use**.
@@ -43,8 +48,11 @@ guarantee exemption from provider pausing. Backups/recovery remain necessary.
 
 ## Deployment and cutover
 
-1. Run `pnpm test:scheduler`, `pnpm bundle:scheduler`, and `pnpm lint`. Bundling is
-   a dry run and does not deploy to either account.
+1. Run `pnpm test:scheduler`, `pnpm test:scheduler-runtime`, and `pnpm lint`.
+   Runtime tests execute the exact deploy bundle in workerd with all outbound
+   requests intercepted. They verify real Fetch/stream/KV behavior and rejection
+   of redirects; Node-only mocks cannot prove Workers API compatibility. Bundling
+   is a dry run and does not deploy to either account.
 2. Authenticate Wrangler to Adrian with Workers scripts/KV and read-only
    account/user/tail permissions. Check `wrangler whoami` with the unrelated
    environment token removed **for that process only**. Do not overwrite other

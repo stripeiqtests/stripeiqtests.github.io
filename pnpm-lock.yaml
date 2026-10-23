@@ -69,6 +69,9 @@ importers:
       globals:
         specifier: ^16.5.0
         version: 16.5.0
+      miniflare:
+        specifier: 5.20261019.2-beta
+        version: 5.20261019.2-beta(@types/node@24.19.2)
       supabase:
         specifier: 2.109.1
         version: 2.109.1

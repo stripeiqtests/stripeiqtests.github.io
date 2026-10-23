@@ -10,7 +10,16 @@ const LIMIT = 65536;
 class CheckError extends Error {}
 function fail(code) { throw new CheckError(code); }
 
-async function read(path, { json = false, database = false, body, limit = LIMIT } = {}, transport = fetch) {
+async function read(path, options = {}, transport = fetch) {
+  try { return await readResponse(path, options, transport); } catch (error) {
+    if (error instanceof CheckError) throw error;
+    const stage = path.includes('/rest/v1/') ? 'database' : path.includes('/storage/') ? 'storage' : path.includes('.gif') ? 'static_image' : path.includes('unused.invalid') ? 'mail_response' : 'homepage';
+    const category = ['TypeError', 'RangeError', 'AbortError', 'TimeoutError'].includes(error?.name) ? error.name : 'Error';
+    fail(`${stage}_${category}`);
+  }
+}
+
+async function readResponse(path, { json = false, database = false, body, limit = LIMIT } = {}, transport = fetch) {
   const response = await transport(path, {
     method: body === undefined ? 'GET' : 'POST',
     headers: {
@@ -19,7 +28,7 @@ async function read(path, { json = false, database = false, body, limit = LIMIT 
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
-    redirect: 'error',
+    redirect: 'manual',
     signal: AbortSignal.timeout(12000),
     cf: { cacheTtl: 0, cacheEverything: false },
   });
@@ -100,7 +109,7 @@ export async function drainMail(env, transport = fetch) {
   if (env.MAIL_ENABLED !== 'outbox-v1') return { status: 'disabled' };
   if (!env.RESULT_EMAIL_WORKER_SECRET || env.RESULT_EMAIL_WORKER_SECRET.length < 32) fail('mail_secret_missing');
   const response = await transport(`${DATABASE}/functions/v1/send-results-email`, {
-    method: 'POST', redirect: 'error',
+    method: 'POST', redirect: 'manual',
     headers: { Authorization: `Bearer ${env.RESULT_EMAIL_WORKER_SECRET}`, 'Content-Type': 'application/json' },
     body: '{}', signal: AbortSignal.timeout(90000),
   });
@@ -124,6 +133,12 @@ export function inspectStatus(state, now = Date.now(), maxAge = 8 * 3600000) {
 
 export async function runScheduled(event, env, transport = fetch, now = Date.now()) {
   if (![HEALTH_CRON, MAIL_CRON, PROBE_CRON].includes(event.cron)) fail('unknown_schedule');
+  // Deleted Cron triggers can still propagate for 15 minutes. Never let a
+  // delayed probe exceed its explicitly authorized ten-minute execution window.
+  if (event.cron === PROBE_CRON) {
+    const start = Date.parse(env.HEALTH_PROBE_STARTED_AT);
+    if (!Number.isFinite(start) || now < start || now >= start + 600000) return { status: 'disabled' };
+  }
   const kind = event.cron === MAIL_CRON ? 'mail' : 'health';
   if (kind === 'mail' && env.MAIL_ENABLED !== 'outbox-v1') return { status: 'disabled' };
   if (!env.STATUS) fail('status_binding_missing');

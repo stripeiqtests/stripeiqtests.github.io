@@ -35,7 +35,7 @@ jobs:
       - run: pnpm test:rich-text
       - run: pnpm test:hosting
       - run: pnpm test:scheduler
-      - run: pnpm bundle:scheduler
+      - run: pnpm test:scheduler-runtime
       - run: pnpm test:edge
       - run: pnpm check:edge
       - run: pnpm bundle:edge

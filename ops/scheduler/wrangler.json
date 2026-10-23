@@ -2,7 +2,7 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "supabase-read-health",
   "account_id": "93995a2ee892a5f3efa03bf62c2d31b9",
-  "main": "worker.mjs",
+  "main": "index.mjs",
   "compatibility_date": "2026-10-23",
   "workers_dev": true,
   "preview_urls": false,

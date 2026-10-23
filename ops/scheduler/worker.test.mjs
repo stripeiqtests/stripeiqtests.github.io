@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker, { HEALTH_CRON, MAIL_CRON, checkHealth, drainMail, inspectStatus, runScheduled } from './worker.mjs';
+import worker, { HEALTH_CRON, MAIL_CRON, PROBE_CRON, checkHealth, drainMail, inspectStatus, runScheduled } from './worker.mjs';
 
 const now = Date.parse('2026-10-23T08:30:00Z');
 function store(initial = {}) {
@@ -30,13 +30,13 @@ test('real bounded reads use publishable key; empty bucket is explicitly skipped
   for (const c of f.calls) {
     assert.equal(new URL(c.url).searchParams.has('health'), false);
     assert.equal(c.options.headers.Authorization, undefined);
-    assert.equal(c.options.redirect, 'error');
+    assert.equal(c.options.redirect, 'manual');
     assert.ok(c.options.signal instanceof AbortSignal);
   }
   assert.deepEqual(JSON.parse(f.calls[3].options.body), { prefix: '', limit: 10, offset: 0, sortBy: { column: 'name', order: 'asc' } });
 });
 test('public Storage image sampled, URL-encoded, response checked', async () => {
-  const f = fixture({ listing: [{ name: 'картинка #1.png', id: 'object' }] });
+  const f = fixture({ listing: [{ name: 'РєР°СЂС‚РёРЅРєР° #1.png', id: 'object' }] });
   assert.ok((await checkHealth(f.transport)).checks.includes('storage_object_download'));
   assert.ok(f.calls.at(-1).url.includes('%23'));
   await assert.rejects(checkHealth(fixture({ listing: [{ name: 'x', id: 'id' }], objectType: 'text/html' }).transport), /invalid_storage_image/);
@@ -70,7 +70,7 @@ test('failed checks preserve last success and sanitize secrets', async () => {
   const STATUS = store({ health: { last_success_at: timestamp } });
   await assert.rejects(runScheduled({ cron: HEALTH_CRON }, { STATUS }, async () => { throw new Error('SECRET'); }, now), /health_failed/);
   assert.equal(STATUS.data.health.last_success_at, timestamp);
-  assert.equal(STATUS.data.health.error, 'request_failed');
+  assert.equal(STATUS.data.health.error, 'database_Error');
   assert.equal(STATUS.data.health.attempts, 2);
 });
 test('no green status if KV persistence fails; invalid cron makes no request', async () => {
@@ -91,7 +91,7 @@ test('private mail calls have fixed origin, payload, bounded time and no redirec
   const r = await drainMail({ MAIL_ENABLED: 'outbox-v1', RESULT_EMAIL_WORKER_SECRET: key }, async (url, options) => {
     assert.equal(url, 'https://afsoyuczexiztsjntkvi.supabase.co/functions/v1/send-results-email');
     assert.equal(options.headers.Authorization, `Bearer ${key}`);
-    assert.equal(options.body, '{}'); assert.equal(options.redirect, 'error');
+    assert.equal(options.body, '{}'); assert.equal(options.redirect, 'manual');
     return Response.json({ processed: 2, sent: 2 });
   });
   assert.deepEqual(r, { status: 'ok', processed: 2, sent: 2 });
@@ -132,4 +132,12 @@ test('existing public health URL reports persisted freshness, not a new DB read'
   STATUS.data.health.checked_at = STATUS.data.health.last_success_at = new Date(Date.now() - 9 * 3600000).toISOString();
   assert.equal((await worker.fetch(new Request(url), { STATUS })).status, 503);
   assert.equal((await worker.fetch(new Request(url), {})).status, 503);
+});
+test('temporary probe cannot read or write outside its approved ten-minute window', async () => {
+  const start = new Date(now).toISOString();
+  for (const [HEALTH_PROBE_STARTED_AT, at] of [[undefined, now], ['invalid', now], [start, now - 1], [start, now + 600000]]) {
+    assert.deepEqual(await runScheduled({ cron: PROBE_CRON }, { HEALTH_PROBE_STARTED_AT }, () => assert.fail(), at), { status: 'disabled' });
+  }
+  const STATUS = store();
+  assert.equal((await runScheduled({ cron: PROBE_CRON }, { HEALTH_PROBE_STARTED_AT: start, STATUS }, fixture().transport, now + 599999)).status, 'ok');
 });
