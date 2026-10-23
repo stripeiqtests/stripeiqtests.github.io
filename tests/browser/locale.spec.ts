@@ -18,3 +18,16 @@ test('bilingual switching has selected-state semantics and settings have a trans
   await expect(page.getByRole('link',{name:'Settings',exact:true})).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang','en');
 });
+
+test('changing language keeps the unsaved follow-up test selection',async({page,api})=>{
+  await login(page);api.settings.language_mode='bilingual';
+  await page.goto('/admin/settings');
+  await page.getByRole('combobox',{name:'Целевой тест',exact:true}).selectOption('iq-test');
+  await page.getByRole('button',{name:'EN (English)',exact:true}).click();
+  await expect(page.getByRole('combobox',{name:'Target Test',exact:true})).toHaveValue('iq-test');
+  expect(api.settings.follow_up_test_slug).toBe('');
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await expect.poll(()=>api.settings.follow_up_test_slug).toBe('iq-test');
+  await page.reload();
+  await expect(page.getByRole('combobox',{name:'Target Test',exact:true})).toHaveValue('iq-test');
+});

@@ -126,6 +126,45 @@ test('support is configurable and is not falsely saved on failure', async ({ pag
   await expect(page.getByRole('link', { name: 'Связаться с поддержкой' })).toHaveAttribute('href', 'mailto:help@example.test');
 });
 
+test('a late support-contact read cannot replace a newer saved address',async({page,api})=>{
+  await login(page);
+  let release!:()=>void;
+  const delayed=new Promise<void>(resolve=>{release=resolve;});
+  await page.route('**/rest/v1/app_settings*',async route=>{
+    const request=route.request(),url=new URL(request.url());
+    if(request.method()!=='GET'||url.searchParams.get('key')!=='eq.support_contact')return route.fallback();
+    await delayed;
+    return route.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'*'},
+      body:JSON.stringify({value:'old-support@example.test'})});
+  });
+  try {
+    await page.goto('/admin/settings');
+    await page.getByLabel('Публичный контакт поддержки').fill('new-support@example.test');
+    await page.getByRole('button',{name:'Сохранить контакт',exact:true}).click();
+    await expect(page.getByRole('status').filter({hasText:'Сохранено'})).toBeVisible();
+    expect(api.settings.support_contact).toBe('new-support@example.test');
+    const response=page.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).searchParams.get('key')==='eq.support_contact');
+    release();await (await response).finished();
+    // Allow React's response update to paint before checking that it retained the save.
+    await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+    await expect(page.getByLabel('Публичный контакт поддержки')).toHaveValue('new-support@example.test');
+  } finally {release();}
+});
+
+test('a failed follow-up setting load cannot silently save an empty target',async({page,api})=>{
+  await login(page);api.settings.follow_up_test_slug='iq-test';
+  await page.route('**/rest/v1/app_settings*',route=>{
+    const request=route.request(),url=new URL(request.url());
+    if(request.method()!=='GET'||url.searchParams.get('key')!=='eq.follow_up_test_slug')return route.fallback();
+    return route.fulfill({status:503,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{}'});
+  });
+  await page.goto('/admin/settings');
+  await expect(page.getByRole('alert').filter({hasText:'Не удалось загрузить настройки.'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Сохранить',exact:true})).toBeDisabled();
+  expect(api.settings.follow_up_test_slug).toBe('iq-test');
+  expect(api.requests.some(r=>r.method==='POST'&&r.body?.key==='follow_up_test_slug')).toBe(false);
+});
+
 test('no analytics before consent or after decline; choice can be changed', async ({ page, api }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Отклонить', exact: true })).toBeVisible();

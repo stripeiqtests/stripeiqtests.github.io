@@ -21,6 +21,7 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
     const [saveError, setSaveError] = useState('');
     const [followUpTestSlug, setFollowUpTestSlug] = useState<string>('');
     const [loading, setLoading] = useState(true);
+    const [followUpLoadError, setFollowUpLoadError] = useState(false);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [savingLanguageMode, setSavingLanguageMode] = useState(false);
@@ -28,27 +29,33 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
 
     useEffect(() => {
         let cancelled=false;
-        void supabase
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(),8000);
+        void Promise.resolve(supabase
             .from('app_settings')
             .select('value')
             .eq('key', 'follow_up_test_slug')
-            .maybeSingle().then(({data,error})=>{
+            .retry(false)
+            .abortSignal(controller.signal)
+            .maybeSingle()).then(({data,error})=>{
                 if(cancelled)return;
-                if(error)setSaveError(lang==='ru'?'Не удалось загрузить настройки. Обновите страницу.':'Could not load settings. Please reload.');
+                if(error)setFollowUpLoadError(true);
                 if(data)setFollowUpTestSlug(data.value||'');
-                setLoading(false);
-            });
-        return ()=>{cancelled=true;};
-    }, [lang]);
+            }).catch(()=>{if(!cancelled)setFollowUpLoadError(true);})
+            .finally(()=>{clearTimeout(timeout);if(!cancelled)setLoading(false);});
+        return ()=>{cancelled=true;clearTimeout(timeout);controller.abort();};
+    }, []);
 
     async function saveFollowUpTestSlug() {
+        if (saving || loading || followUpLoadError) return;
         setSaving(true);
         setSaved(false);
 
         setSaveError('');
         try {
             const { error } = await supabase.from('app_settings')
-                .upsert({ key: 'follow_up_test_slug', value: followUpTestSlug, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+                .upsert({ key: 'follow_up_test_slug', value: followUpTestSlug, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+                .abortSignal(AbortSignal.timeout(8000));
             if (error) throw error;
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
@@ -80,7 +87,7 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
 
     return (
         <div className="space-y-6">
-            {saveError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{saveError}</p>}
+            {(saveError || followUpLoadError) && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{saveError || (lang==='ru'?'Не удалось загрузить настройки. Обновите страницу.':'Could not load settings. Please reload.')}</p>}
             <form className="rounded-xl border bg-white p-6" onSubmit={async event => {
                 event.preventDefault(); if (savingContact) return;
                 setSavingContact(true); setContactSaved(false); setSaveError('');
@@ -204,7 +211,8 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
                         <select
                             aria-label={lang==='ru'?'Целевой тест':'Target Test'}
                             value={followUpTestSlug}
-                            onChange={(e) => setFollowUpTestSlug(e.target.value)}
+                            onChange={(e) => { setFollowUpTestSlug(e.target.value);setSaved(false); }}
+                            disabled={saving || followUpLoadError}
                             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         >
                             <option value="">{lang === 'ru' ? '— Кнопка скрыта —' : '— Button hidden —'}</option>
@@ -218,7 +226,7 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
 
                     <button
                         onClick={saveFollowUpTestSlug}
-                        disabled={saving}
+                            disabled={saving || followUpLoadError}
                         className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
                     >
                         {saved ? (

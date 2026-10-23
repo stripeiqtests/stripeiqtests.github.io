@@ -87,8 +87,7 @@ Official references: [Stripe fulfillment](https://docs.stripe.com/checkout/fulfi
 
 ## Administrator presentation rules
 
-The follow-up `20261023073000_result_presentation.sql` is prepared but not applied.
+The follow-up `20261023073000_result_presentation.sql` was separately approved, applied and verified in IQ Tests on 2026-10-23; all nine SQL checks passed and counts remain 2 tests / 21 questions / 6 results.
 It exposes only the public presentation configuration, keeps existing saved email
-copy, and grants the worker read access to authored archetypes. Apply this approved
-migration before deploying the matching email/frontend candidates. See
+copy, and grants the worker read access to authored archetypes. Its named constraint is already installed; do not replay it. Deploy the matching email/frontend candidates separately. See
 `ADMIN_RESULT_RULES.md` for current-result versus frozen-email behavior and defaults.

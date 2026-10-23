@@ -34,6 +34,14 @@ with zero attempt/version rows created by installation. The legacy submission
 grant remains intentionally open until the new frontend is released. Recorded
 hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 
+`20261023073000_result_presentation.sql` was separately explicitly approved and
+applied through the IQ Tests SQL editor on 2026-10-23 (Europe/Minsk). All nine
+read-only installation/access/preservation checks passed; tests/questions/results
+remain 2/21/6. Public HTTP confirms that the new presentation key is readable and
+private admission limits remain hidden. Original stored email copy was retained.
+The matched frontend and functions are still pending release. See
+`audit/production-presentation-schema-2026-10-23.json`. Do not replay its named constraint.
+
 ## Status by audit item
 
 | Item | Implemented / evidence | Still required |
@@ -51,7 +59,7 @@ hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 | A11 changing slug | Existing slug retained on title change; browser test | Release |
 | A12 live question mutation | Private immutable question/scoring/price versions; archive resume; SQL + browser tests, concurrent submission test; migration applied; real preview started/resumed the attempt and loaded all 21 questions | Release frontend; finish approved production submission smoke test |
 | A13 email failures | Durable leased outbox, bounded retries, immutable provider payload, localized email preserving authored interpretations and stored archetype copy; Deno + SQL tests | Private scheduler/secret, failure monitoring, real provider test |
-| A14 score interpretation | Original score thresholds and single-leader descriptions preserved; user-approved default state messages; admin-controlled mixed/priority ties, zero fallback and bilingual messages; shared selection for result/archetype/email, preview, atomic saves and failure recovery | Apply separately approved presentation migration and matching functions/frontend; editorial reinterpretation remains excluded without approval |
+| A14 score interpretation | Original score thresholds and single-leader descriptions preserved; user-approved default state messages; admin-controlled mixed/priority ties, zero fallback and bilingual messages; shared selection for result/archetype/email, preview, atomic saves and failure recovery | Presentation migration applied; deploy matching functions/frontend; editorial reinterpretation remains excluded without approval |
 | A15 tracking consent | No eager tracking, explicit allow/decline/revoke; browser network test; Inter now self-hosted | Release |
 | A16 banner overlap | Consent in document flow; mobile browser test | Release |
 | A17 mobile entry | First-screen CTA/price, wider vertical card; mobile browser test | Release; broader device review |
@@ -65,12 +73,14 @@ hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 | A25 security headers/logging | Capability log removed; no-store responses; sanitized logs; CSP/HSTS/frame/referrer headers verified on actual Cloudflare preview; Pages write/OIDC permissions limited to main-only deployment job, checkout does not persist credentials | Coordinate production hosting rollout |
 | A26 routes/metadata | Route titles, canonical/noindex; Cloudflare preview direct /privacy returns HTTP 200 and renders app under CSP | Live domain still uses GitHub Pages and returns 404 on direct routes; hosting rollout |
 | A27 duplicate analytics | Consent-gated purchase, SHA-256 transaction ID; concurrent callbacks deduplicate even with blocked storage; broken providers cannot block checkout/answers; browser tests | Release |
-| A28 locale/support/demo | Public support configurable in admin; English mode survives blocked preference storage; settings label translated; preview gated by administrator auth; actual payment pages now read/save canonical per-language content keys, independently tested through reload and mid-edit language switch | Source-question translations require separate user review; release |
+| A28 locale/support/demo | Public support configurable in admin; late reads cannot replace newer saved contacts; unsaved follow-up selections survive language changes; English mode survives blocked preference storage; settings label translated; preview gated by administrator auth; actual payment pages now read/save canonical per-language content keys, independently tested through reload and mid-edit language switch | Source-question translations require separate user review; release |
 | A29 upload/orphan quota | Format/signature/decode/size/dimension validation; cancel cleans only editor-owned uploads; saved/ambiguous writes preserved; 5 browser tests passed; upload limits applied | Release frontend; reference-aware GC review for old orphans |
 
 ## Validation already exercised
 
-- Administrator presentation controls: agreed state messages are defaults; mixed/priority tie selection and explicit zero fallback are editable with preview, bilingual text and staged default reset. All 20 affected browser scenarios passed, including an expanded-form axe check without exclusions; all 13 Edge tests and real PostgreSQL 17 migration/RLS/size/worker/backup contracts passed. Invalid/unavailable rules prevent guessed profile delivery. The initial full browser run passed 51/53; two new tests needed role-based locators for nested labels, then bilingual mode enabled in the bilingual fixture. See `ADMIN_RESULT_RULES.md` and `audit/admin-presentation-2026-10-23.json`. The new production migration and all matching frontend/functions are still pending deployment.
+- Settings-state follow-up: both late support-contact replacement and lost follow-up draft on language switch were reproduced before the fix. The fixes preserve successful writes and unsaved selections; failed target loads cannot save an empty fallback. All 27 affected browser scenarios passed, followed by three final targeted regressions after the PromiseLike typing/editor-lock correction; lint/build/security/rich-text/hosting passed. No production writes were needed for these tests. See `audit/settings-state-races-2026-10-23.json`.
+
+- Administrator presentation controls: agreed state messages are defaults; mixed/priority tie selection and explicit zero fallback are editable with preview, bilingual text and staged default reset. All 20 affected browser scenarios passed, including an expanded-form axe check without exclusions; all 13 Edge tests and real PostgreSQL 17 migration/RLS/size/worker/backup contracts passed. Invalid/unavailable rules prevent guessed profile delivery. The initial full browser run passed 51/53; two new tests needed role-based locators for nested labels, then bilingual mode enabled in the bilingual fixture. See `ADMIN_RESULT_RULES.md` and `audit/admin-presentation-2026-10-23.json`. The new production migration was subsequently approved, applied and verified; all matching frontend/functions still await deployment. Full Linux CI for `af16cf3` passed all 53 browser tests, 13 Edge tests and all SQL/security/build gates ([39918144002](https://github.com/stripeiqtests/stripeiqtests.github.io/actions/runs/39918144002)).
 
 - Content-load race reproduced before the fix: a held initial response replaced a successful edit with its old snapshot. The regression now preserves the new saved key while accepting unrelated server content. All 22 affected reliability/payment-editor/accessibility scenarios passed; after the cancellation compatibility/lint follow-up, both content regressions passed again, lint was clean and the production build passed. No production content writes were used.
 - Full Linux CI passed for authored-copy restoration `8678f1c`, including 49 browser tests, 10 Edge tests, PostgreSQL/backup, monitoring, security and build gates ([39914254956](https://github.com/stripeiqtests/stripeiqtests.github.io/actions/runs/39914254956)).
