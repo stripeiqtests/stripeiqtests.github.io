@@ -13,9 +13,28 @@ Every six hours (00:23, 06:23, 12:23, 18:23 UTC, with up to five minutes jitter)
    check of displayed illustrations, not an administrator upload or a Storage
    write-permission test. Use `supabase/tests/storage_readiness.sql` after a
    database recovery to check the Storage bucket and policies too.
+4. Read the public `images` bucket listing through the Storage API, sampling at
+   most three folder listings with ten entries each. If an image is available in
+   that sample, fetch its public bytes. An empty bucket or bounded sample without
+   files explicitly records `storage_object_download` as skipped, not passed.
+   This does not test administrator uploads, all stored files, or private buckets.
 
 The service retries a failed check once. Its exit code and last result are
 recorded by systemd. `status.json` retains the last successful check time.
+Errors preserve that timestamp; successful retries clear the preceding error.
+Failure to persist status makes the service fail as well. An offline status mode
+rejects missing, malformed, failed, future-dated or more than eight-hour-old
+reports. It performs no database/network activity:
+
+```sh
+python3 /opt/inner-code-health/healthcheck.py --status-file /var/lib/private/inner-code-health/status.json
+```
+
+Use this command from an independent operator/monitor with read access to that
+file to detect a stopped timer. Merely having the checker installed does not run
+it or send an alert, and checking from the same VPS cannot detect the whole VPS
+being offline. The notification destination and an external watchdog remain
+unconfigured; there is no claim of automatic incident notification.
 It does not send messages or modify test data. Failed checks do not attempt
 to resume a paused project or alter permissions.
 
@@ -54,6 +73,11 @@ This lowers inactivity risk on Free; it is not a guarantee. The VPS must remain
 online, and a failure notification destination can be configured separately.
 It avoids depending on public-repository GitHub schedules, which can be disabled
 after 60 days without repository activity. No artificial commits are created.
+
+The 12 fixture scenarios run in PR/release CI without production access. The
+live check is deliberately separate and uses only the publishable key. Its
+status report contains check names, times and operational errors, no answers,
+emails, result capabilities or authentication secrets.
 
 References:
 - https://supabase.com/docs/guides/platform/free-project-pausing

@@ -54,6 +54,9 @@ jobs:
       - name: Database contracts in isolated PostgreSQL
         run: pnpm test:database
 
+      - name: Read-only monitor contracts
+        run: python3 -m unittest discover -s ops/health -p 'test_*.py' -v
+
       - name: Setup Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5, Node 24
         with:

@@ -16,4 +16,4 @@ RestrictSUIDSGID=yes
 CapabilityBoundingSet=
 MemoryMax=64M
 CPUQuota=10%
-TimeoutStartSec=120
+TimeoutStartSec=180

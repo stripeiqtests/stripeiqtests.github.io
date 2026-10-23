@@ -38,6 +38,7 @@ jobs:
       - run: pnpm check:edge
       - run: pnpm bundle:edge
       - run: pnpm test:database
+      - run: python3 -m unittest discover -s ops/health -p 'test_*.py' -v
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:browser
       - run: pnpm build
