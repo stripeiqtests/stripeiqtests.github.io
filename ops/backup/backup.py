@@ -139,7 +139,9 @@ class Storage:
                 raise BackupError("Storage returned an unexpected status")
             return response
         except urllib.error.HTTPError as error:
-            raise BackupError(f"Storage HTTP {error.code}; no complete backup was created") from None
+            code = error.code
+            error.close()
+            raise BackupError(f"Storage HTTP {code}; no complete backup was created") from None
         except (OSError, urllib.error.URLError):
             raise BackupError("Storage connection failed") from None
 

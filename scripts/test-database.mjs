@@ -18,7 +18,9 @@ function docker(args, quiet = false) {
   return result.stdout?.trim();
 }
 const temp = resolve(root, 'node_modules/.tmp/database-test', runId);
-mkdirSync(temp, { recursive: true });
+// Decrypted recovery data must be private on Linux as well as in the Windows
+// fixture directory. The unique run directory did not previously set its mode.
+mkdirSync(temp, { recursive: true, mode: 0o700 });
 // Minimal platform schemas expose the same SQL boundary used by our functions.
 // This executes real PostgreSQL/RLS; it does not emulate Supabase HTTP services.
 const platform = `
