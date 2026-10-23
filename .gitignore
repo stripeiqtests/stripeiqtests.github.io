@@ -30,6 +30,9 @@ __pycache__/
 *.pgpass
 backup.config.json
 age-identity.txt
+.wrangler/
+.dev.vars
+.dev.vars.*
 # Logs
 npm-debug.log*
 yarn-debug.log*

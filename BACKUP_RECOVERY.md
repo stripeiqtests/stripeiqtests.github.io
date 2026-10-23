@@ -21,7 +21,7 @@ dump is staged in a private directory and removed after the run. Encrypted
 archives contain a manifest with per-file SHA-256/size and original object
 metadata. Raw SQL, results, email addresses, tokens and provider error bodies
 are never printed. The private decryption identity is **not** needed on the
-backup VPS. Keep it on the recovery computer and in a second private offline
+backup execution environment. Keep it on the recovery computer and in a second private offline
 location; losing it makes the archives unusable.
 
 A power loss or forced termination can leave a private `.dump-*` work directory
@@ -38,9 +38,9 @@ external writer or an adversary reverting metadata.
 
 The script has a 4 GiB total plaintext budget, bounded listing/manifest sizes and
 disk-space checks. This is an application limit, not an allowance from Supabase.
-Budget actual database size, Storage egress and VPS free disk before enabling a
-schedule. The existing small VPS needs review if the dataset grows. Weekly full
-copies are the initial template; make another copy before risky changes. No
+Budget actual database size, Storage egress and free disk before enabling a
+schedule. The shared Telegraph VPS is excluded from IQ Tests. Weekly full
+copies are the initial target; make another copy before risky changes. No
 automatic deletion is enabled: a failed run must not remove the last good copy.
 After verifying copies, set a retention policy appropriate to disk and privacy
 requirements. Keep at least one encrypted copy on another machine/provider.
@@ -61,7 +61,7 @@ Do not claim an entire Supabase service is restored by restoring PostgreSQL.
 2. On the **recovery computer**, run `age-keygen -o age-identity.txt`, protect that
    file, and copy only the public `age1…` recipient to backup configuration.
    Test it with a fixture archive first. Do not paste the identity into chat/Git
-   or install it on the VPS. Windows requires a private ACL; Unix requires 0600.
+   or install it in the backup execution environment. Windows requires a private ACL; Unix requires 0600.
 3. In the correct Supabase project's Connect panel obtain the session pooler
    hostname or direct IPv6 hostname and the trusted database CA certificate.
    `pg_host` allows only this project's direct hostname or a Supabase session
@@ -76,19 +76,17 @@ Do not claim an entire Supabase service is restored by restoring PostgreSQL.
    export. These privileged credentials must not enter Git, command arguments,
    public monitors or logs. Windows ACL protection is an operator prerequisite;
    the portable script can enforce Unix mode bits only.
-5. Copy `ops/backup/config.example.json` to the private host configuration and
-   fill its public recipient/host/certificate path. The service template expects
-   root-owned files in `/etc/inner-code-backup/`: `config.json`, `db.pgpass` and
-   `storage-key` (0600). systemd `LoadCredential` provides private runtime copies
-   to the dynamic service user; the CA certificate is public read-only material.
-   Install the reviewed script at `/opt/inner-code-backup/backup.py` and ensure
-   pinned tools are on the service's PATH.
-6. Review/install the `.service` and `.timer` templates. Run the service manually
-   **before enabling the timer**, check its JSON `status=ok`, and securely copy
-   the encrypted archive from the service's StateDirectory to the recovery
-   computer. Do not turn on the schedule until the following live restore drill
-   succeeds. Check systemd exit status/journal and archive age; notifications and
-   a maximum backup-age alert still need an operator-selected destination.
+5. Copy `ops/backup/config.example.json` to protected local configuration and
+   fill its public recipient/host/certificate path. Run the first backup from the
+   operator's recovery computer. The old systemd templates are historical, were
+   never installed, and are not part of the IQ Tests deployment.
+6. Check the manual run's JSON `status=ok`, then retain the encrypted archive on
+   another operator-controlled device/provider. Complete the following live
+   restore drill before choosing automated retention/storage. A future GitHub
+   Actions backup can use this same tool with protected credentials and only
+   encrypted output, but is not configured or claimed as running. Cloudflare's
+   small scheduler must never receive database passwords or private backup keys.
+   Backup age alerts still need an operator-selected destination.
 
 For a manual run, use a private configuration whose file paths point to the
 operator's protected local files:

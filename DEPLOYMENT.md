@@ -196,6 +196,8 @@ References:
 - https://supabase.com/docs/guides/platform/backups
 - https://docs.github.com/en/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows
 
-The free monitor is installed on the existing VPS as "inner-code-health.timer".
-See [ops/health/README.md](ops/health/README.md) for the schedule, checks, status
-commands and rollback. It is independent of GitHub and the developer laptop.
+The selected free scheduler is the existing Cloudflare Worker
+`supabase-read-health`, independent of GitHub, the developer laptop and the
+Telegraph VPS. See [ops/scheduler/README.md](ops/scheduler/README.md) for the
+deployment/cutover gates and actual status. The previous VPS timer is retired
+only after a verified replacement check; historical evidence is retained.

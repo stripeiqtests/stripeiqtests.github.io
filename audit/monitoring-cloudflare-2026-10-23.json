@@ -1,0 +1,65 @@
+{
+  "target": {
+    "cloudflare_account": "93995a2ee892a5f3efa03bf62c2d31b9",
+    "worker": "supabase-read-health",
+    "supabase_project": "afsoyuczexiztsjntkvi"
+  },
+  "previous": {
+    "version": "acc2faba-d103-482e-b61d-d4779fab0030",
+    "source_sha256": "2010b6e7a753d0a26c456f563271943ea67c738d9e5a39e362158773930e36d3",
+    "schedule": "17 */6 * * *",
+    "behavior": "Public active-test SELECT; no Storage/site checks; no persisted freshness; logs disabled. Source/settings saved outside repository before replacement."
+  },
+  "deployment": {
+    "version": "9a75324d-e1b7-462d-befa-d8ba60126666",
+    "deployment_id": "3adf4151-9e43-4a46-a95e-07096760af4f",
+    "created_at": "2026-10-23T08:37:39.852608Z",
+    "verified_at": "2026-10-23T08:41:27.503448Z",
+    "traffic_percent": 100,
+    "kv_namespace": "80a6a5eabf0a45c0b261ac2be4ade4a4",
+    "crons": [
+      "17 */6 * * *",
+      "*/2 * * * *"
+    ],
+    "mail_enabled": false,
+    "logs_enabled": true
+  },
+  "checks": {
+    "isolated_scheduler_cases": 13,
+    "scheduler_bundle": "passed, 8.51KiB / gzip 3.05KiB",
+    "lint": "passed",
+    "security_regression": "passed",
+    "hosting_cases": 2,
+    "dependency_audit": "no known advisories",
+    "local_live_read_only_preflight": {
+      "checks": [
+        "active_test_database_read",
+        "homepage",
+        "question_illustration",
+        "storage_listing"
+      ],
+      "skipped": [
+        {
+          "check": "storage_object_download",
+          "reason": "bucket_empty"
+        }
+      ]
+    }
+  },
+  "pending": [
+    "Actual Cloudflare scheduled health verification",
+    "VPS IQ timer retirement after verified replacement",
+    "Matching private Supabase function/worker secret and controlled queue test",
+    "Alert destination/independent watchdog",
+    "Live encrypted off-site backup and isolated hosted restore drill"
+  ],
+  "approval_review": {
+    "preflight_KV_seed": "rejected; not executed; no synthetic green production report written",
+    "temporary_probe_schedule": "rejected pending separate user approval; not executed"
+  },
+  "source_sha256": {
+    "ops/scheduler/worker.mjs": "12d7d409233f7d46e935167f64b9893e883597676783e30678e259a29d3cdfd3",
+    "ops/scheduler/wrangler.json": "3d5de50c5f0aa093f4f1bd534f621edccf7342bb94eacfe76d75fd3b4cf52301",
+    "ops/scheduler/worker.test.mjs": "7825a485e92a8336a23729f2e191aea9563a2f890bd9d660d75ecdbf3351ec63"
+  }
+}

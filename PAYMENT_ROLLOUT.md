@@ -39,10 +39,14 @@ metadata; current editable test prices are not used to reject those payments.
 - Create the Stripe endpoint at
   `https://afsoyuczexiztsjntkvi.supabase.co/functions/v1/stripe-webhook`, subscribed
   to `checkout.session.completed` and `checkout.session.async_payment_succeeded`.
-- Run the private email worker every few minutes, POST `{}` with its Bearer secret.
+- Use the existing Cloudflare Worker `supabase-read-health` to invoke the private
+  email worker every two minutes, POST `{}` with its narrow Bearer secret.
   This is a release gate for both payment paths: verification and the webhook
   commit paid access + outbox and return without contacting the mail provider.
-  Store it in a root-readable environment file, not the public healthcheck/repository.
+  Store it as an encrypted Cloudflare Worker secret, never in the repository or
+  the public health check. No VPS or systemd service is needed. Follow
+  `ops/scheduler/README.md`; `MAIL_ENABLED` remains disabled until the matching
+  Supabase function is deployed and its private authentication has been verified.
   The monitor/notification destination is not chosen yet; do not send messages.
 - Never paste real secret values into chat, source, shell history or screenshots.
   Credential entry/creation in the browser is a user handoff when required.
