@@ -2,8 +2,7 @@ name: Validate application
 
 on:
   pull_request:
-  push:
-    branches: [fix/audit-reliability]
+  workflow_dispatch:
 
 permissions:
   contents: read

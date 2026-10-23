@@ -309,7 +309,7 @@ export function Test() {
             <Brain className="w-6 h-6 text-indigo-600" />
             <span className="font-medium text-gray-900">{test?.title}</span>
           </div>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-gray-600">
             {currentIndex + 1} / {questions.length}
           </span>
         </div>

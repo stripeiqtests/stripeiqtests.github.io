@@ -517,7 +517,7 @@ export function Results() {
           ) : (
             <h1 className="text-3xl font-bold text-gray-900">{getContent(`results_title${langKey}`, resultsTitle)}</h1>
           )}
-          <p className="text-gray-500 mt-2">{test?.title}</p>
+        <p className="text-gray-600 mt-2">{test?.title}</p>
         </div>
 
         {/* Overall Score */}

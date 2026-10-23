@@ -58,7 +58,7 @@ hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 | A19 accessibility | Named controls, headings/landmarks, native password dialog, keyboard focus recovery; 15 screen states pass axe 4.14.0 without exclusions; compact confirmation controls retained | Manual gradient contrast, screen-reader and broader device review; release |
 | A20 monitoring | Existing free 6h read-only check remains | Storage/database coverage, staleness, chosen alert channel |
 | A21 backups | Not implemented | Encrypted DB + Storage backup and restore drill |
-| A22 schema/CI | Baseline, clean real PostgreSQL migration/RLS/scoring checks, browser/Edge deployment gates; full PR CI passed for 1eff085 including production-major and Edge bundle gates | Reconcile live migration history |
+| A22 schema/CI | Baseline, clean real PostgreSQL migration/RLS/scoring checks, browser/Edge deployment gates; full PR CI passed for 61e8678 with 44 browser tests; removed duplicate push/PR validation starts | Reconcile live migration history |
 | A23 dependency advisories | Compatible dependency updates, DOMPurify 3.4.17; pnpm audit reports zero advisories; build/browser checks passed | Release; track deprecated ESLint 9 separately |
 | A24 anonymous abuse | Private attempt capability, bounded snapshot/answer sizes, UTC admission quotas, shared versions, abandoned-attempt cleanup; real anon/auth and concurrent SQL checks; schema applied | Frontend rollout and explicit legacy RPC cutover; monitor quota exhaustion; stronger bot controls remain open |
 | A25 security headers/logging | Capability log removed; no-store responses; sanitized logs; CSP/HSTS/frame/referrer headers verified on actual Cloudflare preview | Coordinate production hosting rollout |
@@ -71,6 +71,7 @@ hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 
 - `pnpm test:browser`: all 43 tests passed, including pinned attempts/lost submission response, stale payment/result requests, preview authorization, locale, analytics and upload cleanup. 15 screen states had zero detected axe violations without rule/selector exclusions; incomplete gradient-contrast checks remain a manual review item. See `audit/accessibility-and-payment-ui-2026-10-23.json`.
 - A subsequent successful-payment fixture confirms protected-result navigation, the actual discounted amount in analytics and no duplicate purchase on a repeated return-page visit; all 12 affected payment/accessibility tests passed after adding it.
+- Full Linux CI subsequently passed for `61e8678`: all 44 browser tests, PostgreSQL concurrency/grants, Edge, lint and production build. The small contrast follow-up passed all 7 accessibility scenarios locally.
 - `pnpm lint`, `pnpm build`, `pnpm test:security`, `pnpm test:rich-text`, `pnpm test:hosting`: passed for this revision.
 - `deno check --config supabase/functions/deno.json` for all four payment/worker entry points passed.
 - `pnpm test:edge`: all 9 tests passed, including expired checkout recovery. No real payments/emails/network destinations used.
