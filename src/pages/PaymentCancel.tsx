@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { XCircle } from 'lucide-react';
-import { useLanguage } from '../lib/i18n';
+import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
 import { trackPaymentCancel } from '../lib/analytics';
@@ -13,6 +13,7 @@ export function PaymentCancel() {
   const { lang } = useLanguage();
   const { isAdmin } = useAdmin();
   const { getContent, saveContent } = useContent();
+  const contentKey = (name:string) => `${name}_${lang}`;
 
   // Track payment cancellation event
   useEffect(() => {
@@ -29,30 +30,31 @@ export function PaymentCancel() {
   return (
     <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
+        <div className="flex justify-end mb-4"><LanguageSwitcher /></div>
         <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          {isAdmin ? (
-            <EditableField
-              value={getContent('payment_cancel_title', defaultTitle)}
-              onSave={(value) => saveContent('payment_cancel_title', value)}
-              as="span"
-              className="text-2xl font-bold text-gray-900"
-            />
-          ) : (
-            getContent('payment_cancel_title', defaultTitle)
-          )}
-        </h1>
+        {isAdmin ? (
+          <EditableField
+            key={contentKey('payment_cancel_title')}
+            value={getContent(contentKey('payment_cancel_title'), defaultTitle)}
+            onSave={(value) => saveContent(contentKey('payment_cancel_title'), value)}
+            as="h1"
+            className="text-2xl font-bold text-gray-900 mb-2"
+          />
+        ) : (
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{getContent(contentKey('payment_cancel_title'), defaultTitle)}</h1>
+        )}
         <div className="text-gray-500 mb-6">
           {isAdmin ? (
             <EditableField
-              value={getContent('payment_cancel_message', defaultMessage)}
-              onSave={(value) => saveContent('payment_cancel_message', value)}
+              key={contentKey('payment_cancel_message')}
+              value={getContent(contentKey('payment_cancel_message'), defaultMessage)}
+              onSave={(value) => saveContent(contentKey('payment_cancel_message'), value)}
               as="span"
               className="text-gray-500"
               multiline
             />
           ) : (
-            getContent('payment_cancel_message', defaultMessage)
+            getContent(contentKey('payment_cancel_message'), defaultMessage)
           )}
         </div>
 
@@ -61,14 +63,14 @@ export function PaymentCancel() {
             to={`/results/${sessionId}`}
             className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700"
           >
-            {getContent('payment_cancel_button', defaultButton)}
+            {getContent(contentKey('try_again_button'), defaultButton)}
           </Link>
         ) : (
           <Link
             to="/"
             className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700"
           >
-            {getContent('payment_cancel_home_button', defaultHomeButton)}
+            {getContent(contentKey('back_to_home'), defaultHomeButton)}
           </Link>
         )}
       </div>

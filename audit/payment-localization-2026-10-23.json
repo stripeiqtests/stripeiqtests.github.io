@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-23",
+  "environment": "Local Vite, isolated Supabase/payment browser fixtures, Chromium 390x844",
+  "production_changed": false,
+  "full_local_browser_tests_passed_before_final_label_correction": 48,
+  "affected_tests_passed_after_final_label_correction": 13,
+  "scenarios": [
+    "Cancellation page reads saved Russian/English titles, messages and return/home button text",
+    "Success preview saves independent locale keys and retains both versions through reload",
+    "Cancellation preview edits the same localized message that the public page reads",
+    "Switching language while an inline draft is open cannot write that draft into the other language",
+    "Real pending/failure screens read localized processing and payment_error keys",
+    "Fixed verification safety advice remains visible independently of custom copy",
+    "Payment preview headings no longer contain block editor containers or incorporate the edit button into their heading name",
+    "Compact language buttons expose names containing visible RU/EN and their full language names"
+  ],
+  "axe": {
+    "version": "4.14.0",
+    "added_states_with_zero_detected_violations": ["admin-payment-success-bilingual", "admin-payment-cancel-bilingual"],
+    "total_screen_states": 17,
+    "disabled_rules": [],
+    "excluded_selectors": []
+  },
+  "copy_compatibility": "Canonical keys already exist in the seeded/public home_content schema. Shared unsuffixed historical keys are retained as data but cannot override per-language pages; no database migration or automatic content rewrite was performed.",
+  "limitations": "No production frontend publication or real Stripe/Resend round trip. Source question language and legacy cognitive/archetype claims remain separate audit work."
+}

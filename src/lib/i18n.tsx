@@ -400,7 +400,7 @@ export function LanguageSwitcher() {
             <button
                 type="button"
                 aria-pressed={lang==='ru'}
-                aria-label="Русский"
+                aria-label="RU (Русский)"
                 className={`lang-btn ${lang === 'ru' ? 'active' : ''}`}
                 onClick={() => setLang('ru')}
             >
@@ -409,7 +409,7 @@ export function LanguageSwitcher() {
             <button
                 type="button"
                 aria-pressed={lang==='en'}
-                aria-label="English"
+                aria-label="EN (English)"
                 className={`lang-btn ${lang === 'en' ? 'active' : ''}`}
                 onClick={() => setLang('en')}
             >

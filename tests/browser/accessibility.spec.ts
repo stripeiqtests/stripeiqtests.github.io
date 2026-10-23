@@ -83,3 +83,14 @@ test('administrator paywall preview remains editable and passes accessibility ch
   await scan(page,info,'admin-paywall-editing');
   await page.screenshot({path:info.outputPath('compact-paywall-editor.png'),fullPage:false});
 });
+
+test('administrator payment success and cancellation previews keep valid headings and named controls',async({page,api},info)=>{
+  api.settings.language_mode='bilingual';
+  await login(page);
+  await page.goto('/payment/success?preview=admin&session_id=demo');
+  await expect(page.getByRole('heading',{name:'Оплата прошла успешно!',exact:true})).toBeVisible();
+  await scan(page,info,'admin-payment-success');
+  await page.goto('/payment/cancel?preview=admin');
+  await expect(page.getByRole('heading',{name:'Оплата отменена',exact:true})).toBeVisible();
+  await scan(page,info,'admin-payment-cancel');
+});

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { CheckCircle } from 'lucide-react';
-import { useLanguage } from '../lib/i18n';
+import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
 import { trackPurchase } from '../lib/analytics';
@@ -21,6 +21,7 @@ export function PaymentSuccess() {
   const verificationGeneration = useRef(0);
   const verificationRequest = useRef<{checkoutId:string;controller:AbortController}|null>(null);
   const { getContent, saveContent } = useContent();
+  const contentKey = (name:string) => `${name}_${lang}`;
   const errorMessage=verificationFailed ? (lang === 'ru' ? 'Не удалось подтвердить статус. Если деньги списаны, не платите повторно: повторите проверку или обратитесь в поддержку.' : 'We could not confirm the status. If you were charged, do not pay again: retry verification or contact support.') : null;
 
   const handlePaymentSuccess = useCallback(async (stripeSessionId: string) => {
@@ -97,41 +98,31 @@ export function PaymentSuccess() {
   const defaultProcessing = lang === 'ru' ? 'Обрабатываем ваши результаты...' : 'Processing your results...';
   const defaultError = lang === 'ru' ? 'Что-то пошло не так. Свяжитесь с поддержкой.' : 'Something went wrong. Please contact support.';
 
-  // Admin preview mode - show editable content (or static preview if not logged in)
+  // Only an authenticated administrator can enter the editable preview.
   if (!authLoading && isPreview) {
     return (
       <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
+          <div className="flex justify-end mb-4"><LanguageSwitcher /></div>
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {isAdmin ? (
-              <EditableField
-                value={getContent('payment_success_title', defaultTitle)}
-                onSave={(value) => saveContent('payment_success_title', value)}
-                as="span"
-                className="text-2xl font-bold text-gray-900"
-              />
-            ) : (
-              getContent('payment_success_title', defaultTitle)
-            )}
-          </h1>
+          <EditableField
+            key={contentKey('payment_success_title')}
+            value={getContent(contentKey('payment_success_title'), defaultTitle)}
+            onSave={(value) => saveContent(contentKey('payment_success_title'), value)}
+            as="h1"
+            className="text-2xl font-bold text-gray-900 mb-2"
+          />
           <div className="text-gray-500 mb-4">
-            {isAdmin ? (
-              <EditableField
-                value={getContent('payment_success_processing', defaultProcessing)}
-                onSave={(value) => saveContent('payment_success_processing', value)}
-                as="span"
-                className="text-gray-500"
-              />
-            ) : (
-              getContent('payment_success_processing', defaultProcessing)
-            )}
+            <EditableField
+              key={contentKey('payment_success_processing')}
+              value={getContent(contentKey('payment_success_processing'), defaultProcessing)}
+              onSave={(value) => saveContent(contentKey('payment_success_processing'), value)}
+              as="span"
+              className="text-gray-500"
+            />
           </div>
           <p className="text-sm text-indigo-600 bg-indigo-50 p-3 rounded-lg">
-            {isAdmin
-              ? (lang === 'ru' ? 'Режим редактирования: нажмите на текст для изменения' : 'Edit mode: click text to edit')
-              : (lang === 'ru' ? 'Превью страницы оплаты' : 'Payment page preview')
-            }
+            {lang === 'ru' ? 'Режим редактирования: нажмите на текст для изменения' : 'Edit mode: click text to edit'}
           </p>
         </div>
       </div>
@@ -143,18 +134,19 @@ export function PaymentSuccess() {
       <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
           <h1 className="text-xl font-bold text-gray-900 mb-3">{lang==='ru'?'Не удалось подтвердить оплату':'Could not confirm payment'}</h1>
-          <p className="text-gray-500 mb-4">
+          <div className="text-gray-500 mb-4">
             {isAdmin ? (
               <EditableField
-                value={getContent('payment_success_error', defaultError)}
-                onSave={(value) => saveContent('payment_success_error', value)}
+                key={contentKey('payment_error')}
+                value={getContent(contentKey('payment_error'), defaultError)}
+                onSave={(value) => saveContent(contentKey('payment_error'), value)}
                 as="span"
                 className="text-gray-500"
               />
             ) : (
-              getContent('payment_success_error', defaultError)
+              getContent(contentKey('payment_error'), defaultError)
             )}
-          </p>
+          </div>
           {errorMessage && (
             <p role="alert" className="text-red-800 text-sm bg-red-50 p-3 rounded-lg">{errorMessage}</p>
           )}
@@ -172,7 +164,7 @@ export function PaymentSuccess() {
           {lang === 'ru' ? 'Подтверждаем оплату' : 'Confirming payment'}
         </h1>
         <p className="text-gray-500 mb-4">
-          {getContent('payment_success_processing', defaultProcessing)}
+          {getContent(contentKey('payment_success_processing'), defaultProcessing)}
         </p>
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
       </div>
