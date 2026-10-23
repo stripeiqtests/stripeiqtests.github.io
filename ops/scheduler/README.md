@@ -6,14 +6,23 @@ has the `inner-code-iq-test` Pages project and an older scheduled health Worker.
 Do not create a duplicate or use the global CLI token for the unrelated account
 `d08aef3b51fc374db9c4eb76f63ac3f3`.
 
-Status: replacement deployed as version `8e34c58b-9552-4bd2-88c2-b0f1ee8ddab5`.
+Status: health cutover first passed with version
+`8e34c58b-9552-4bd2-88c2-b0f1ee8ddab5`; current readiness release is
+`f4c796ed-b067-4ba6-a6c9-32d70c6b8fbf`.
 A real Cloudflare scheduled health run passed at 08:59:08 UTC on 2026-10-23
 (11:59:08 Europe/Minsk), persisted in KV, 3 ms CPU. Public status returns 200.
 The old IQ Tests VPS timer is disabled/inactive; Telegraph services stay active.
 Temporary minute scheduling was removed; stale probe invocations stop doing work
-after their ten-minute window even during Cron propagation. The matching private
-mail function has not been released; mail remains disabled. See
-`audit/monitoring-cloudflare-2026-10-23.json`.
+after their ten-minute window even during Cron propagation. The private `result-email-worker` endpoint is deployed and rejects public calls.
+The scheduled mail path currently uses `MAIL_ENABLED=preflight-v1`: only
+`{"dryRun":true}` readiness reads run, with no claims, writes or provider calls.
+Its first real Cloudflare readiness report passed at 09:46:26 UTC on 2026-10-23,
+with an empty queue. Actual delivery (`outbox-v1`) awaits explicit approval.
+`verify-payment` version 13 now commits paid access/outbox without inline mail.
+Already-paid legacy results retain their existing capability and do not enqueue
+a historical copy. Fresh-process CLI checks verified the saved isolated login
+and both active functions. See `audit/mail-queue-rollout-2026-10-23.json` and
+the preceding `audit/monitoring-cloudflare-2026-10-23.json`.
 
 ## Schedule and boundaries
 
@@ -21,13 +30,13 @@ mail function has not been released; mail remains disabled. See
   active test ID through the Data API without caching, homepage, static question
   GIF and a bounded public Storage sample. An empty bucket explicitly skips
   object download. No uploads, simulated users, results, writes or fake commits.
-- `*/2 * * * *`: at most 720 mail calls/day, **disabled by default**. After the
-  coordinated release, POST `{}` to `send-results-email` with its dedicated
+- `*/2 * * * *`: at most 720 mail calls/day, **delivery held during preflight**. After the
+  coordinated release, POST `{}` to `result-email-worker` with its dedicated
   `RESULT_EMAIL_WORKER_SECRET`. Each call handles at most five due jobs; database
   leases, retry limits and provider idempotency remain in force. The scheduler
   never receives a service-role key, Stripe/Resend key, result token, recipient,
   email body or backup credentials.
-- KV `STATUS` retains sanitized `health`/`mail` reports and last success. Failure
+- KV `STATUS` retains sanitized `health`/`mail` reports and separate `mail_preflight` readiness reports and last success. Failure
   preserves last success and fails the invocation. Partial mail delivery records
   `retry_pending`, not green success. The existing public `/health/supabase` GET/HEAD URL reports only cached health
   freshness (200/503). It cannot run SQL or send email; other paths return 404.
@@ -63,8 +72,10 @@ guarantee exemption from provider pausing. Backups/recovery remain necessary.
    committed in `wrangler.json`. Never seed a fabricated green production report.
 4. Deploy reviewed code/config with mail disabled. Enable mail only after the
    matching private Supabase function is deployed, public requests return 403,
-   the same narrow secret is installed on both sides and an approved controlled
-   queue test passes. Then set `MAIL_ENABLED=outbox-v1`; update the configuration
+   the same narrow secret is installed on both sides and dispatch is explicitly
+   approved. Provider acceptance/inbox delivery still need separate observation. A `preflight-v1` schedule can safely verify private authentication/configuration
+   first: it never claims or sends jobs and saves a separate `mail_preflight`
+   report. After explicit dispatch approval, set `MAIL_ENABLED=outbox-v1`; update the configuration
    for subsequent deploys so that choice is preserved.
 5. Verify an actual scheduled health run in Cloudflare and its KV report,
    including checks/skips and Free CPU/errors. A local dry run is insufficient.
@@ -96,3 +107,19 @@ References:
 - https://developers.cloudflare.com/kv/platform/limits/
 - https://supabase.com/docs/guides/platform/free-project-pausing
 - https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule
+
+## CLI account isolation
+
+Native Supabase CLI `--profile` did not keep a stable identity through the shared
+Windows keyring during this rollout: a later command resolved a different
+organization and the fixed IQ project ref correctly produced 403. Do not deploy
+from that context or read credentials out of Credential Manager. Use the
+operator-approved isolated `SUPABASE_HOME` directory with a private ACL and
+`SUPABASE_NO_KEYRING=1`, complete the normal CLI login there, then assert that
+`projects list` contains `afsoyuczexiztsjntkvi` before each release command.
+The private home/access token never belongs in Git or chat. A local operator
+wrapper now fixes the home/profile, clears any ambient access token for its own
+process, asserts the exact project/name/organization and restores the preceding
+environment afterwards. Two fresh invocations confirmed persisted access; a
+new login is only needed if the credential expires, is revoked or is removed.
+The local wrapper and auth directory are retained outside this repository.

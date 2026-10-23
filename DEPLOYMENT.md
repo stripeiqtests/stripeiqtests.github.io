@@ -1,11 +1,13 @@
-# IQ Test — secure deployment
+# IQ Test вЂ” secure deployment
 
 > **2026-10-22 audit release:** read `AUDIT_REMEDIATION.md` and
 > `PAYMENT_ROLLOUT.md` first. Production has manually applied SQL and no reconciled
 > CLI migration history. Do not blindly run the historical `db push` instructions
 > below. The explicitly approved `20261022190000_audit_safety.sql` and
 > `20261022200000_payment_fulfillment.sql` have been applied and verified.
-> Matching payment functions and frontend release remain pending.
+> `verify-payment` and the private queue endpoint are deployed; automatic mail
+> dispatch awaits approval. Remaining payment functions/webhook/frontend release
+> remain pending. See `audit/mail-queue-rollout-2026-10-23.json`.
 
 The application is a static React frontend backed by Supabase, Stripe and
 Resend. Test takers do not need accounts. Administrators sign in through
@@ -29,7 +31,7 @@ ID.
 
 ## 2. Create the administrator before changing RLS
 
-Create the administrator in Supabase Dashboard under Authentication → Users.
+Create the administrator in Supabase Dashboard under Authentication в†’ Users.
 Set a strong password and add one of these values to the user's app metadata:
 
 ```json
@@ -59,9 +61,9 @@ Required secrets:
 
 - `STRIPE_SECRET_KEY`
 - `RESEND_API_KEY`
-- `APP_DOMAIN` — the exact public application origin, for example
+- `APP_DOMAIN` вЂ” the exact public application origin, for example
   `https://example.com`
-- `RICH_TEXT_COMPATIBILITY_MODE` — optional email-rendering rollback flag;
+- `RICH_TEXT_COMPATIBILITY_MODE` вЂ” optional email-rendering rollback flag;
   leave unset or `false` by default
 
 Supabase supplies `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to deployed

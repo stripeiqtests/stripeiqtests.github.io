@@ -1,0 +1,92 @@
+{
+  "recordedAt": "2026-10-23T09:53:59.786103+00:00",
+  "projectRef": "afsoyuczexiztsjntkvi",
+  "production": {
+    "verifyPaymentVersion": 13,
+    "queueWorkerVersion": 2,
+    "legacyCreateCheckoutVersion": 12,
+    "legacyDirectMailerVersion": 8,
+    "stripeWebhookDeployed": false,
+    "frontendReleased": false,
+    "cloudflareVersion": "f4c796ed-b067-4ba6-a6c9-32d70c6b8fbf",
+    "mailMode": "preflight-v1",
+    "schedules": [
+      {
+        "cron": "17 */6 * * *",
+        "created_on": "2026-07-20T18:35:49.246947Z",
+        "modified_on": "2026-07-20T18:44:20.566404Z"
+      },
+      {
+        "cron": "*/2 * * * *",
+        "created_on": "2026-10-23T08:37:42.18618Z",
+        "modified_on": "2026-10-23T08:37:42.18618Z"
+      }
+    ]
+  },
+  "scheduledReports": {
+    "health": {
+      "checked_at": "2026-10-23T08:59:08.944Z",
+      "last_success_at": "2026-10-23T08:59:08.944Z",
+      "status": "ok",
+      "checks": [
+        "active_test_database_read",
+        "homepage",
+        "question_illustration",
+        "storage_listing"
+      ],
+      "skipped_checks": [
+        {
+          "check": "storage_object_download",
+          "reason": "bucket_empty"
+        }
+      ],
+      "attempts": 1
+    },
+    "mail": {
+      "checked_at": "2026-10-23T09:38:36.841Z",
+      "last_success_at": null,
+      "status": "error",
+      "attempts": 1,
+      "error": "mail_secret_missing"
+    },
+    "mail_preflight": {
+      "checked_at": "2026-10-23T09:50:29.929Z",
+      "last_success_at": "2026-10-23T09:50:29.929Z",
+      "status": "ok",
+      "mode": "preflight",
+      "hasPendingJobs": false,
+      "attempts": 1
+    }
+  },
+  "benignHttpChecks": {
+    "verify-payment_POST": {
+      "status": 400,
+      "body": "{\"error\":\"Invalid Stripe session ID\"}"
+    },
+    "verify-payment_OPTIONS": {
+      "status": 200,
+      "body": ""
+    },
+    "result-email-worker_POST": {
+      "status": 403,
+      "body": "{\"error\":\"Forbidden\"}"
+    }
+  },
+  "validation": {
+    "edgeTests": 16,
+    "schedulerTests": 15,
+    "edgeTypechecksAndBundles": 5,
+    "exactBundleWorkerd": "passed; all outbound calls intercepted",
+    "lint": "passed",
+    "persistedIsolatedCliLogin": "verified in two fresh invocations; exact project/name/organization guard"
+  },
+  "boundaries": {
+    "actualDispatch": "not enabled; explicit approval required after automatic approval review rejected a call that could send real email",
+    "providerAcceptance": "not tested",
+    "inboxDelivery": "not tested",
+    "noTestPaymentOrResultOrEmail": true,
+    "authoredCopy": "unchanged",
+    "pending": "dispatch approval, actual scheduled processing evidence; remaining checkout/webhook/frontend release tracked separately"
+  },
+  "recovery": "Keep isolated local CLI home; do not read shared Credential Manager. Preserve outbox and paid access. Preflight reports use separate KV and cannot overwrite delivery failures."
+}

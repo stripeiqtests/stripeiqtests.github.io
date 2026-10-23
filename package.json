@@ -17,7 +17,7 @@
     "test:database": "node scripts/test-database.mjs",
     "test:backup": "node scripts/test-backup.mjs",
     "test:edge": "deno test --config supabase/functions/deno.json --allow-env supabase/functions/tests",
-    "check:edge": "deno check --config supabase/functions/deno.json supabase/functions/create-checkout/index.ts supabase/functions/verify-payment/index.ts supabase/functions/send-results-email/index.ts supabase/functions/stripe-webhook/index.ts",
+    "check:edge": "deno check --config supabase/functions/deno.json supabase/functions/create-checkout/index.ts supabase/functions/verify-payment/index.ts supabase/functions/send-results-email/index.ts supabase/functions/result-email-worker/index.ts supabase/functions/stripe-webhook/index.ts",
     "test:hosting": "node --test scripts/hosting.test.mjs",
     "test:scheduler": "node --test ops/scheduler/worker.test.mjs",
     "bundle:scheduler": "wrangler deploy --config ops/scheduler/wrangler.json --dry-run --outdir node_modules/.tmp/scheduler-bundle",

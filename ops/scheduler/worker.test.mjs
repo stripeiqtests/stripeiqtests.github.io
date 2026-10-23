@@ -89,12 +89,24 @@ test('mail is disabled until explicit coordinated outbox cutover', async () => {
 test('private mail calls have fixed origin, payload, bounded time and no redirects', async () => {
   const key = 'private-worker-secret-32-bytes-long';
   const r = await drainMail({ MAIL_ENABLED: 'outbox-v1', RESULT_EMAIL_WORKER_SECRET: key }, async (url, options) => {
-    assert.equal(url, 'https://afsoyuczexiztsjntkvi.supabase.co/functions/v1/send-results-email');
+    assert.equal(url, 'https://afsoyuczexiztsjntkvi.supabase.co/functions/v1/result-email-worker');
     assert.equal(options.headers.Authorization, `Bearer ${key}`);
     assert.equal(options.body, '{}'); assert.equal(options.redirect, 'manual');
     return Response.json({ processed: 2, sent: 2 });
   });
   assert.deepEqual(r, { status: 'ok', processed: 2, sent: 2 });
+});
+test('preflight schedule never requests delivery and stores a separate readiness status', async () => {
+  const STATUS = store();
+  const env = { STATUS, MAIL_ENABLED: 'preflight-v1', RESULT_EMAIL_WORKER_SECRET: 'x'.repeat(32) };
+  const response = await runScheduled({ cron: MAIL_CRON }, env, async (_url, init) => {
+    assert.equal(init.body, '{"dryRun":true}');
+    return Response.json({ protocol: 'outbox-v1', ready: true, hasPendingJobs: false });
+  }, now);
+  assert.equal(response.mode, 'preflight');
+  assert.equal(STATUS.data.mail, undefined);
+  assert.equal(STATUS.data.mail_preflight.mode, 'preflight');
+  await assert.rejects(drainMail(env, async () => Response.json({ processed: 0, sent: 0 })), /mail_preflight_failed/);
 });
 test('failed/partial deliveries and mismatched server responses fail monitoring', async () => {
   const env = { MAIL_ENABLED: 'outbox-v1', RESULT_EMAIL_WORKER_SECRET: 'x'.repeat(32) };

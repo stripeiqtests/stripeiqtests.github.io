@@ -61,6 +61,37 @@ export async function fulfillPayment(
   checkout: Stripe.Checkout.Session,
 ): Promise<Fulfillment> {
   const facts = paymentFacts(checkout);
+  if (facts.orderId === null) {
+    // Old verification sent mail directly without an outbox record. Preserve
+    // its already-paid behavior instead of enqueueing a second historical copy
+    // when a user revisits a pre-upgrade Checkout return URL.
+    const [legacy] = await db.read<{
+      test_id: string;
+      is_paid: boolean;
+      stripe_session_id: string | null;
+      access_token: string;
+    }[]>(
+      "test_sessions",
+      `id=eq.${facts.sessionId}&select=test_id,is_paid,stripe_session_id,access_token&limit=1`,
+    );
+    if (legacy?.is_paid) {
+      if (
+        legacy.test_id !== facts.testId ||
+        legacy.stripe_session_id !== checkout.id ||
+        !uuid.test(legacy.access_token)
+      ) {
+        throw new Error("Legacy payment mismatch");
+      }
+      return {
+        success: true,
+        testSessionId: facts.sessionId,
+        testId: facts.testId,
+        amountPaid: facts.total,
+        resultAccessToken: legacy.access_token,
+        alreadyProcessed: true,
+      };
+    }
+  }
   return await db.rpc<Fulfillment>("fulfill_checkout", {
     p_order_id: facts.orderId,
     p_session_id: facts.sessionId,

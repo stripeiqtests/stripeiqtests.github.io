@@ -105,13 +105,13 @@ export async function checkHealth(transport = fetch) {
 }
 
 export async function drainMail(env, transport = fetch) {
-  // Production currently has an older function. An explicit cutover is required.
-  if (env.MAIL_ENABLED !== 'outbox-v1') return { status: 'disabled' };
+  const preflight = env.MAIL_ENABLED === 'preflight-v1';
+  if (!preflight && env.MAIL_ENABLED !== 'outbox-v1') return { status: 'disabled' };
   if (!env.RESULT_EMAIL_WORKER_SECRET || env.RESULT_EMAIL_WORKER_SECRET.length < 32) fail('mail_secret_missing');
-  const response = await transport(`${DATABASE}/functions/v1/send-results-email`, {
+  const response = await transport(`${DATABASE}/functions/v1/result-email-worker`, {
     method: 'POST', redirect: 'manual',
     headers: { Authorization: `Bearer ${env.RESULT_EMAIL_WORKER_SECRET}`, 'Content-Type': 'application/json' },
-    body: '{}', signal: AbortSignal.timeout(90000),
+    body: preflight ? '{"dryRun":true}' : '{}', signal: AbortSignal.timeout(90000),
   });
   // Never log the body: it can contain personal data on a bad/mismatched server.
   if (response.status !== 200) { await response.body?.cancel(); fail(`mail_http_${response.status}`); }
@@ -119,6 +119,10 @@ export async function drainMail(env, transport = fetch) {
   if (length && Number(length) > 1024) { await response.body?.cancel(); fail('mail_invalid_response'); }
   // Same bounded streaming reader, using this already-received response only.
   const result = await read('https://unused.invalid', { json: true, limit: 1024 }, async () => response);
+  if (preflight) {
+    if (result?.protocol !== 'outbox-v1' || result.ready !== true || typeof result.hasPendingJobs !== 'boolean') fail('mail_preflight_failed');
+    return { status: 'ok', mode: 'preflight', hasPendingJobs: result.hasPendingJobs };
+  }
   if (!Number.isInteger(result?.processed) || !Number.isInteger(result?.sent) || result.sent < 0 || result.processed < result.sent || result.processed > 5) fail('mail_invalid_response');
   return { status: result.sent === result.processed ? 'ok' : 'retry_pending', processed: result.processed, sent: result.sent };
 }
@@ -139,7 +143,7 @@ export async function runScheduled(event, env, transport = fetch, now = Date.now
     const start = Date.parse(env.HEALTH_PROBE_STARTED_AT);
     if (!Number.isFinite(start) || now < start || now >= start + 600000) return { status: 'disabled' };
   }
-  const kind = event.cron === MAIL_CRON ? 'mail' : 'health';
+  const kind = event.cron === MAIL_CRON ? (env.MAIL_ENABLED === 'preflight-v1' ? 'mail_preflight' : 'mail') : 'health';
   if (kind === 'mail' && env.MAIL_ENABLED !== 'outbox-v1') return { status: 'disabled' };
   if (!env.STATUS) fail('status_binding_missing');
   const previous = await env.STATUS.get(kind, 'json');

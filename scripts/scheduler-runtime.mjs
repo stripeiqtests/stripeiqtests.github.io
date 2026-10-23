@@ -51,3 +51,28 @@ try {
   assert.equal((await runtime.dispatchFetch('https://fixture/health/supabase')).status, 503);
   console.log('Workers runtime checks passed: exact bundle, read-only health, KV freshness, disabled mail, redirect rejection.');
 } finally { await runtime.dispose(); }
+
+let mailCalls = 0;
+const mailRuntime = new Miniflare(convertV4MiniflareOptions({
+  modules: true,
+  scriptPath: 'ops/scheduler/node_modules/.tmp/scheduler-bundle/index.js',
+  compatibilityDate: '2026-10-23',
+  kvNamespaces: ['STATUS'],
+  bindings: { MAIL_ENABLED: 'outbox-v1', RESULT_EMAIL_WORKER_SECRET: 'fixture-worker-secret-longer-than-32-bytes' },
+  outboundService: async request => {
+    mailCalls++;
+    assert.equal(request.url, 'https://afsoyuczexiztsjntkvi.supabase.co/functions/v1/result-email-worker');
+    assert.equal(request.headers.get('authorization'), 'Bearer fixture-worker-secret-longer-than-32-bytes');
+    assert.equal(await request.text(), '{}');
+    return Response.json({ processed: 0, sent: 0 });
+  },
+}));
+try {
+  await mailRuntime.ready;
+  await (await mailRuntime.getWorker()).scheduled({ cron: MAIL_CRON });
+  const status = await (await mailRuntime.getKVNamespace('STATUS')).get('mail', 'json');
+  assert.equal(status.status, 'ok');
+  assert.equal(status.processed, 0);
+  assert.equal(mailCalls, 1);
+  console.log('Enabled mail schedule passed with native Workers Fetch, fixed private endpoint and narrow secret.');
+} finally { await mailRuntime.dispose(); }

@@ -8,7 +8,7 @@ import {createHash} from 'node:crypto';
 const {build}=createRequire(import.meta.resolve('vite'))('esbuild');
 const root=resolve(import.meta.dirname,'..');
 const output=resolve(root,'node_modules/.tmp/edge-bundles');
-const names=['create-checkout','verify-payment','send-results-email','stripe-webhook'];
+const names=['create-checkout','verify-payment','send-results-email','result-email-worker','stripe-webhook'];
 await mkdir(output,{recursive:true});
 const manifest={project:'afsoyuczexiztsjntkvi',deployed:false,functions:[]};
 for(const name of names){

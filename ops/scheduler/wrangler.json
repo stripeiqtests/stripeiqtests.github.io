@@ -8,7 +8,7 @@
   "preview_urls": false,
   "keep_vars": true,
   "triggers": { "crons": ["17 */6 * * *", "*/2 * * * *"] },
-  "vars": { "MAIL_ENABLED": "false" },
+  "vars": { "MAIL_ENABLED": "preflight-v1" },
   "kv_namespaces": [{ "binding": "STATUS", "id": "80a6a5eabf0a45c0b261ac2be4ade4a4" }],
   "observability": { "enabled": true, "head_sampling_rate": 1 }
 }

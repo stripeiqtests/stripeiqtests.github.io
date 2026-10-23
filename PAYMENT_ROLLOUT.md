@@ -2,24 +2,29 @@
 
 This is a reviewable release procedure, not evidence that deployment happened.
 The database migration was explicitly approved and applied on 2026-10-22; its
-seven read-only production checks passed. Edge functions, Stripe webhook setup,
-private worker and frontend deployment are still outstanding.
-Target: `afsoyuczexiztsjntkvi` only. The globally authenticated Supabase CLI account
-currently does not list this project; do not deploy with that account or switch to
-another project to make a command pass.
+seven read-only production checks passed. The private `result-email-worker` was deployed on 2026-10-23 with a dedicated
+secret and a successful scheduled read-only readiness check. Actual dispatch
+is held pending explicit approval. `verify-payment` version 13 is deployed: it
+commits paid access/outbox without waiting for the provider and preserves
+already-paid legacy results without re-enqueueing historical mail. Remaining
+payment functions, Stripe webhook setup and frontend release are tracked separately.
+Target: `afsoyuczexiztsjntkvi` only. A shared Windows CLI credential changed
+identity during the rollout; its attempt to update verification correctly failed
+with 403 for the fixed IQ ref. Use an isolated operator-approved Supabase home
+and assert project membership before each mutation. See `ops/scheduler/README.md`.
 
 ## Package
 
 1. `20261022200000_payment_fulfillment.sql`: private immutable checkout orders,
    atomic entitlement + email enqueue, leased retry outbox, capability-protected
    result context (also works after test archival).
-2. Updated `create-checkout`, `verify-payment`, `send-results-email` and new
-   `stripe-webhook`, with shared modules and the committed Deno dependency lock.
+2. Updated `create-checkout`, `verify-payment`, private `result-email-worker`,
+   the future `send-results-email` compatibility alias and `stripe-webhook`, with shared modules and the committed Deno dependency lock.
 3. Matching frontend: sends locale, displays actual email queue state and reads
    result metadata through the capability-protected context endpoint.
 
 For the dashboard's single-file editor, `pnpm bundle:edge` bundles local shared
-modules into four readable candidates under `node_modules/.tmp/edge-bundles/`.
+modules into five readable candidates under `node_modules/.tmp/edge-bundles/`.
 `manifest.json` records the exact target, file hashes and JWT setting; it does not
 deploy anything or contain secret values. The external Stripe npm import stays
 version-pinned. Prefer normal multifile CLI/MCP deployment once the correct
@@ -45,14 +50,16 @@ metadata; current editable test prices are not used to reject those payments.
   commit paid access + outbox and return without contacting the mail provider.
   Store it as an encrypted Cloudflare Worker secret, never in the repository or
   the public health check. No VPS or systemd service is needed. Follow
-  `ops/scheduler/README.md`; `MAIL_ENABLED` remains disabled until the matching
-  Supabase function is deployed and its private authentication has been verified.
+  `ops/scheduler/README.md`; `MAIL_ENABLED=preflight-v1` performs only protected readiness reads; actual
+  `outbox-v1` delivery remains held until the matching
+  Supabase function and secret are verified and explicit dispatch approval is received.
   The monitor/notification destination is not chosen yet; do not send messages.
 - Never paste real secret values into chat, source, shell history or screenshots.
   Credential entry/creation in the browser is a user handoff when required.
 
 Live preflight found existing names `STRIPE_SECRET_KEY`, `RESEND_API_KEY`,
-`SERVICE_KEY` and `STRIPE_WEBHOOK_SECRET`. Their values were not revealed. A
+a legacy `SERVICE_KEY ` name (with a trailing space) and `STRIPE_WEBHOOK_SECRET`.
+The new code uses the built-in service-role fallback. Values were not revealed. A
 stored webhook secret name does not verify the Stripe endpoint/account/mode;
 inspect that endpoint and signed delivery before treating it as configured.
 

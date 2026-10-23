@@ -10,13 +10,73 @@ import { createVerificationHandler } from "../verify-payment/handler.ts";
 import { createWebhookHandler } from "../stripe-webhook/handler.ts";
 import { deliverEmails, renderEmail } from "../_shared/email.ts";
 import { defaultPresentation } from "../_shared/presentation.ts";
-import { handler as emailHandler } from "../send-results-email/handler.ts";
+import {
+  createEmailHandler,
+  handler as emailHandler,
+} from "../send-results-email/handler.ts";
 import { readBody } from "../_shared/http.ts";
 
 const sessionId = "22222222-2222-4222-8222-222222222222";
 const testId = "11111111-1111-4111-8111-111111111111";
 const orderId = "33333333-3333-4333-8333-333333333333";
 const accessToken = "44444444-4444-4444-8444-444444444444";
+
+Deno.test("private email readiness checks configuration without claiming or sending jobs", async () => {
+  const key = "fixture-worker-secret";
+  Deno.env.set("RESULT_EMAIL_WORKER_SECRET", key);
+  Deno.env.set("RESEND_API_KEY", "fixture-provider-key");
+  const reads: string[] = [];
+  let invalid = false;
+  const handler = createEmailHandler(() => ({
+    rpc: () => {
+      throw new Error("Readiness must not claim, write or send");
+    },
+    read: <T>(table: string) => {
+      reads.push(table);
+      assert.ok(
+        ["result_email_outbox", "app_settings", "archetype_results"].includes(
+          table,
+        ),
+      );
+      return Promise.resolve(
+        table === "result_email_outbox"
+          ? [{ id: "private-id" }]
+          : table === "app_settings" && invalid
+          ? [{ value: "{}" }]
+          : [],
+      ) as Promise<T>;
+    },
+  }));
+  const request = (authorized = true) =>
+    new Request("https://fixture", {
+      method: "POST",
+      headers: {
+        Authorization: authorized ? `Bearer ${key}` : "Bearer public-key",
+      },
+      body: JSON.stringify({ dryRun: true }),
+    });
+  try {
+    assert.equal((await handler(request(false))).status, 403);
+    assert.equal(reads.length, 0);
+    const response = await handler(request());
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      protocol: "outbox-v1",
+      ready: true,
+      hasPendingJobs: true,
+    });
+    assert.deepEqual(reads.sort(), [
+      "app_settings",
+      "archetype_results",
+      "result_email_outbox",
+    ]);
+    invalid = true;
+    assert.equal((await handler(request())).status, 503);
+  } finally {
+    Deno.env.delete("RESULT_EMAIL_WORKER_SECRET");
+    Deno.env.delete("RESEND_API_KEY");
+  }
+});
 const checkout = () => ({
   id: "cs_test_fixture",
   object: "checkout.session",
@@ -89,6 +149,39 @@ Deno.test("invalid or incomplete payments cannot reach the fulfillment RPC", asy
       /Invalid payment facts/,
     );
   }
+});
+Deno.test("legacy already-paid results do not enqueue historical mail again", async () => {
+  const legacy = checkout();
+  delete legacy.metadata!.orderId;
+  let fulfills = 0;
+  let paid = true;
+  let wrongCheckout = false;
+  const db: Database = {
+    rpc: <T>() => {
+      fulfills++;
+      return Promise.resolve({ success: true }) as Promise<T>;
+    },
+    read: <T>(table: string, query: string) => {
+      assert.equal(table, "test_sessions");
+      assert.ok(query.includes(`id=eq.${sessionId}`));
+      return Promise.resolve([{
+        test_id: testId,
+        is_paid: paid,
+        stripe_session_id: wrongCheckout ? "cs_test_other" : legacy.id,
+        access_token: accessToken,
+      }]) as Promise<T>;
+    },
+  };
+  const result = await fulfillPayment(db, legacy);
+  assert.equal(result.alreadyProcessed, true);
+  assert.equal(result.resultAccessToken, accessToken);
+  assert.equal(fulfills, 0);
+  wrongCheckout = true;
+  await assert.rejects(() => fulfillPayment(db, legacy), /mismatch/);
+  assert.equal(fulfills, 0);
+  paid = false;
+  await fulfillPayment(db, legacy);
+  assert.equal(fulfills, 1);
 });
 Deno.test("fulfillment uses the signed price snapshot without reading current test price", async () => {
   let called = false;
