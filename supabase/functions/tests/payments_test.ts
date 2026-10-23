@@ -271,7 +271,7 @@ Deno.test("expired Stripe checkout is replaced with a new order instead of repla
   assert.equal(prepared, 2);
   assert.equal(expired, 1);
 });
-Deno.test("email copy is localized, escaped, non-normative and contains a private recovery link", () => {
+Deno.test("email preserves authored interpretations, escapes content and contains a private recovery link", () => {
   const result = {
     id: sessionId,
     email: "fixture@example.test",
@@ -291,9 +291,34 @@ Deno.test("email copy is localized, escaped, non-normative and contains a privat
   assert.ok(payload.html.includes("&lt;img"));
   assert.ok(!payload.html.includes("<img"));
   assert.ok(payload.text.includes(`#access_token=${accessToken}`));
-  assert.ok(payload.text.includes("not an IQ measurement"));
+  assert.ok(
+    payload.text.includes(
+      "There are opportunities for improvement in this area.",
+    ),
+  );
+  assert.ok(!payload.text.includes("not an IQ measurement"));
   assert.ok(!payload.text.includes("Analyst."));
-  assert.ok(payload.subject.startsWith("Your test results"));
+  assert.ok(payload.subject.startsWith("Your IQ Test Results"));
+  const russian = renderEmail(
+    { title: "IQ тест", language: "ru" },
+    { ...result, overall_score: 90, analyst_score: 90 },
+    "support@example.test",
+    {
+      title_ru: "Авторский заголовок",
+      title_en: "Original heading",
+      content_ru: "**Авторский текст** <script>blocked</script>",
+      content_en: "Original text",
+    },
+  );
+  assert.ok(
+    russian.text.includes(
+      "Отлично! Ваши когнитивные способности высокоразвиты.",
+    ),
+  );
+  assert.ok(russian.text.includes("Ваша сильнейшая сторона — Аналитик."));
+  assert.ok(russian.html.includes("<strong>Авторский текст</strong>"));
+  assert.ok(!russian.html.includes("<script>"));
+  assert.equal(russian.subject, "Результаты IQ теста — Балл: 90");
 });
 Deno.test("email delivery freezes provider body, records failures and reuses the provider idempotency key", async () => {
   Deno.env.set("RESEND_API_KEY", "fixture-only");
@@ -340,6 +365,92 @@ Deno.test("email delivery freezes provider body, records failures and reuses the
     assert.equal((await deliverEmails(db, sessionId, transport)).sent, 1);
     assert.equal(finishes[1].p_provider_id, "provider-fixture");
     assert.equal(keys[0], keys[1]);
+  } finally {
+    Deno.env.delete("RESEND_API_KEY");
+  }
+});
+Deno.test("email delivery freezes the stored authored archetype before retrying", async () => {
+  Deno.env.set("RESEND_API_KEY", "fixture-only");
+  let frozen: ReturnType<typeof renderEmail> | null = null;
+  const reads: string[] = [];
+  const bodies: string[] = [];
+  const db: Database = {
+    rpc: async <T>(name: string, args: Record<string, unknown>) => {
+      if (name === "claim_result_emails") {
+        return [{
+          id: orderId,
+          session_id: sessionId,
+          lease_id: accessToken,
+          title: "IQ тест",
+          language: "ru",
+          payload: frozen,
+        }] as T;
+      }
+      if (name === "set_result_email_payload") {
+        frozen = args.p_payload as ReturnType<typeof renderEmail>;
+        return frozen as T;
+      }
+      assert.equal(name, "finish_result_email");
+      return true as T;
+    },
+    read: async <T>(table: string, query: string) => {
+      reads.push(table);
+      if (table === "test_sessions") {
+        return [{
+          id: sessionId,
+          email: "fixture@example.test",
+          access_token: accessToken,
+          is_paid: true,
+          overall_score: 80,
+          analyst_score: 90,
+          strategist_score: 70,
+          observer_score: 60,
+          intuitive_score: 50,
+        }] as T;
+      }
+      if (table === "app_settings") {
+        return [{ value: "support@example.test" }] as T;
+      }
+      assert.equal(table, "archetype_results");
+      assert.ok(query.startsWith("dimension=eq.analyst&"));
+      return [{
+        title_ru: "Авторский заголовок",
+        title_en: "Original title",
+        content_ru: "**Исходный текст** <img src=x>",
+        content_en: "Original text",
+      }] as T;
+    },
+  };
+  const transport: typeof fetch = (_input, init) => {
+    bodies.push(String(init?.body));
+    return Promise.resolve(
+      new Response(
+        JSON.stringify(
+          bodies.length === 1
+            ? { error: "fixture failure" }
+            : { id: "provider-fixture" },
+        ),
+        { status: bodies.length === 1 ? 503 : 200 },
+      ),
+    );
+  };
+  try {
+    assert.equal((await deliverEmails(db, sessionId, transport)).sent, 0);
+    assert.equal((await deliverEmails(db, sessionId, transport)).sent, 1);
+    assert.deepEqual(reads, [
+      "test_sessions",
+      "app_settings",
+      "archetype_results",
+    ]);
+    assert.equal(bodies[0], bodies[1]);
+    const payload = JSON.parse(bodies[0]);
+    assert.ok(payload.text.includes("**Исходный текст** <img src=x>"));
+    assert.ok(
+      payload.html.includes(
+        "<strong>Исходный текст</strong> &lt;img src=x&gt;",
+      ),
+    );
+    assert.ok(!payload.html.includes("<img"));
   } finally {
     Deno.env.delete("RESEND_API_KEY");
   }

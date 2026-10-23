@@ -1,7 +1,8 @@
 # Audit remediation — 2026-10-22
 
 Working branch: `fix/audit-reliability`. A local passing check is not a production release.
-The original 29-item audit remains the scope; unfinished items are listed below.
+The original 29-item technical audit remains the scope; unfinished items are listed below.
+Authored meaning, marketing copy and result interpretations are preserved. Only unambiguous language errors may be fixed directly; semantic or technical-state wording changes require concrete proposals for user review.
 
 ## Production changes confirmed
 
@@ -49,8 +50,8 @@ hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 | A10 admin validation | Price/options/correct answer/number validation, save locks and errors; image format/signature/decode/size/dimensions validated | Broader validation coverage and release |
 | A11 changing slug | Existing slug retained on title change; browser test | Release |
 | A12 live question mutation | Private immutable question/scoring/price versions; archive resume; SQL + browser tests, concurrent submission test; migration applied; real preview started/resumed the attempt and loaded all 21 questions | Release frontend; finish approved production submission smoke test |
-| A13 email failures | Durable leased outbox, bounded retries, immutable provider payload, localized factual email; Deno + SQL tests | Private scheduler/secret, failure monitoring, real provider test |
-| A14 score interpretation | Neutral percentage wording, ties/zero handled; result helper tests; email fixed | Release; review editable legacy copy |
+| A13 email failures | Durable leased outbox, bounded retries, immutable provider payload, localized email preserving authored interpretations and stored archetype copy; Deno + SQL tests | Private scheduler/secret, failure monitoring, real provider test |
+| A14 score interpretation | Original score thresholds and single-leader descriptions restored; technical zero/tie selection retained; email preserves authored archetype content with escaping | Proposed zero/tie wording needs user review; editorial reinterpretation excluded without approval |
 | A15 tracking consent | No eager tracking, explicit allow/decline/revoke; browser network test; Inter now self-hosted | Release |
 | A16 banner overlap | Consent in document flow; mobile browser test | Release |
 | A17 mobile entry | First-screen CTA/price, wider vertical card; mobile browser test | Release; broader device review |
@@ -64,10 +65,12 @@ hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 | A25 security headers/logging | Capability log removed; no-store responses; sanitized logs; CSP/HSTS/frame/referrer headers verified on actual Cloudflare preview; Pages write/OIDC permissions limited to main-only deployment job, checkout does not persist credentials | Coordinate production hosting rollout |
 | A26 routes/metadata | Route titles, canonical/noindex; Cloudflare preview direct /privacy returns HTTP 200 and renders app under CSP | Live domain still uses GitHub Pages and returns 404 on direct routes; hosting rollout |
 | A27 duplicate analytics | Consent-gated purchase, SHA-256 transaction ID; concurrent callbacks deduplicate even with blocked storage; broken providers cannot block checkout/answers; browser tests | Release |
-| A28 locale/support/demo | Public support configurable in admin; English mode survives blocked preference storage; settings label translated; preview gated by administrator auth; actual payment pages now read/save canonical per-language content keys, independently tested through reload and mid-edit language switch | Remaining source question language and legacy copy review; release |
+| A28 locale/support/demo | Public support configurable in admin; English mode survives blocked preference storage; settings label translated; preview gated by administrator auth; actual payment pages now read/save canonical per-language content keys, independently tested through reload and mid-edit language switch | Source-question translations require separate user review; release |
 | A29 upload/orphan quota | Format/signature/decode/size/dimension validation; cancel cleans only editor-owned uploads; saved/ambiguous writes preserved; 5 browser tests passed; upload limits applied | Release frontend; reference-aware GC review for old orphans |
 
 ## Validation already exercised
+
+- Authored-copy restoration: original homepage metadata/defaults, 16 result interpretation/profile strings and authored email content restored; stored archetypes are escaped and frozen with the provider payload. All 49 browser tests, 10 Edge tests, Edge typechecks/bundles, lint/build/security/rich-text and hosting checks passed locally. No main/frontend/Edge deployment or production stored-copy update occurred. Earlier evidence describing neutral/factual reinterpretations is superseded by `audit/authored-copy-restoration-2026-10-23.json`; `COPY_REVIEW.md` separates proposed technical-state wording for user review.
 
 - Payment-localization follow-up: the full local browser suite passed all 48 tests; a subsequent expanded bilingual accessibility check exposed the RU/EN visible-label mismatch, which was corrected without disabling rules. All 13 affected localization/accessibility scenarios then passed. The two added preview states bring axe coverage to 17 states. See `audit/payment-localization-2026-10-23.json`; all payment requests use fixtures.
 - `a4c468b` passed full Linux CI ([39908855254](https://github.com/stripeiqtests/stripeiqtests.github.io/actions/runs/39908855254)). A manual Pages build on the review branch also passed, including the new artifact action; the publishing job was skipped by the main-only guard ([39908852121](https://github.com/stripeiqtests/stripeiqtests.github.io/actions/runs/39908852121)). No production frontend publication occurred.

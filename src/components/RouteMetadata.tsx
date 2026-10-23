@@ -7,15 +7,12 @@ export function RouteMetadata() {
   useEffect(()=>{
     const ru=lang==='ru';
     const privatePage=/^\/(admin|results|payment)(\/|$)/.test(pathname);
-    const labels:Record<string,string>=ru?{'/':'Логика и внимание','/privacy':'Конфиденциальность','/terms':'Условия использования'}:
-      {'/':'Logic and attention','/privacy':'Privacy','/terms':'Terms of use'};
+    const labels:Record<string,string>=ru?{'/privacy':'Конфиденциальность','/terms':'Условия использования'}:
+      {'/privacy':'Privacy','/terms':'Terms of use'};
     const label=labels[pathname]||(pathname.startsWith('/admin')?(ru?'Панель администратора':'Administration'):
       pathname.startsWith('/payment')?(ru?'Проверка оплаты':'Payment status'):
       pathname.startsWith('/results')?(ru?'Результат теста':'Test result'):(ru?'Пройти тест':'Take a test'));
-    document.title=`${label} — Inner Code`;
-    const description=document.querySelector<HTMLMetaElement>('meta[name="description"]');
-    if(description)description.content=ru?'Развлекательные задания на логику, внимание и поиск закономерностей. Результат описывает эту попытку и не является измерением IQ.':
-      'Recreational logic, attention and pattern tasks. Results describe this attempt and are not an IQ measurement.';
+    document.title=pathname==='/'?'IQ Test - Discover Your Cognitive Profile':`${label} — Inner Code`;
     let robots=document.querySelector<HTMLMetaElement>('meta[name="robots"]');
     if(!robots){robots=document.createElement('meta');robots.name='robots';document.head.append(robots);}
     robots.content=privatePage?'noindex, nofollow':'index, follow';
