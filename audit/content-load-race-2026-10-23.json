@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-23",
+  "reproduction": "Held initial home_content read, saved feature3_title_ru through the admin editor, then released old server snapshot; saved heading disappeared before the fix.",
+  "fix": [
+    "Per-key successful save revisions preserve newer values in late read merges",
+    "Unrelated server content still loads",
+    "Superseded/unmounted loads cancelled",
+    "8-second read/write bounds; read failures preserve current/default content",
+    "Read only key/value columns"
+  ],
+  "validation": {
+    "before": "regression failed at the final saved-heading assertion",
+    "after": "22 affected browser scenarios passed; final compatible cancellation adjustment passed both content regressions; lint/build passed"
+  },
+  "scope": "Isolated fixtures only, no production writes; no authored wording changes; existing large-main-chunk warning remains."
+}

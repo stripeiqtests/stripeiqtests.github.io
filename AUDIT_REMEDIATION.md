@@ -44,7 +44,7 @@ hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 | A04 independent payment fulfillment | Signed webhook shares atomic fulfillment; concurrent SQL connections test | Configure endpoint/secret, verify live delivery and retries |
 | A05 destructive test removal | Archive UI, restore flow, retained questions; browser + SQL tests | Frontend release |
 | A06 result recovery | Explicit private-link copy, blocked-storage fallback, queued email contains recovery link | Deploy queue; independent email-based recovery flow still open |
-| A07 false content/settings saves | Atomic upserts and surfaced failures; browser tests | Release |
+| A07 false content/settings saves | Atomic upserts and surfaced failures; delayed content reads cannot replace a successful newer save, obsolete reads are cancelled and requests are bounded; browser tests | Release |
 | A08 lost drafts | Expiring local drafts, pinned server attempt and restart UI; reload/ambiguous submission browser tests; schema applied | Frontend rollout |
 | A09 missing error states | Question schema validation, retry screens, ErrorBoundary; bounded Home/result/payment requests; stale result, checkout and verification response regressions | Release |
 | A10 admin validation | Price/options/correct answer/number validation, save locks and errors; image format/signature/decode/size/dimensions validated | Broader validation coverage and release |
@@ -69,6 +69,9 @@ hashes and results: `audit/production-attempt-schema-2026-10-23.json`.
 | A29 upload/orphan quota | Format/signature/decode/size/dimension validation; cancel cleans only editor-owned uploads; saved/ambiguous writes preserved; 5 browser tests passed; upload limits applied | Release frontend; reference-aware GC review for old orphans |
 
 ## Validation already exercised
+
+- Content-load race reproduced before the fix: a held initial response replaced a successful edit with its old snapshot. The regression now preserves the new saved key while accepting unrelated server content. All 22 affected reliability/payment-editor/accessibility scenarios passed; after the cancellation compatibility/lint follow-up, both content regressions passed again, lint was clean and the production build passed. No production content writes were used.
+- Full Linux CI passed for authored-copy restoration `8678f1c`, including 49 browser tests, 10 Edge tests, PostgreSQL/backup, monitoring, security and build gates ([39914254956](https://github.com/stripeiqtests/stripeiqtests.github.io/actions/runs/39914254956)).
 
 - Authored-copy restoration: original homepage metadata/defaults, 16 result interpretation/profile strings and authored email content restored; stored archetypes are escaped and frozen with the provider payload. All 49 browser tests, 10 Edge tests, Edge typechecks/bundles, lint/build/security/rich-text and hosting checks passed locally. No main/frontend/Edge deployment or production stored-copy update occurred. Earlier evidence describing neutral/factual reinterpretations is superseded by `audit/authored-copy-restoration-2026-10-23.json`; `COPY_REVIEW.md` separates proposed technical-state wording for user review.
 

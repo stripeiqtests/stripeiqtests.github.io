@@ -69,6 +69,34 @@ test('new content really persists; failure keeps the editor draft', async ({ pag
   await expect(card.locator('input')).toHaveValue('Несохранённый черновик');
 });
 
+test('a delayed content load cannot replace a newer saved value', async ({ page, api }) => {
+  await login(page);
+  let release!: () => void;
+  const delayed = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/rest/v1/home_content*', async route => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await delayed;
+    return route.fulfill({ contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify([
+        {key:'feature3_title_ru',value:'Старый заголовок'},
+        {key:'footer_ru',value:'Контроль завершённой загрузки'},
+      ]) });
+  });
+  try {
+    await page.goto('/');
+    const card = page.locator('section').first().locator('.grid > div').nth(2);
+    await card.getByRole('button',{name:/^Редактировать:/}).first().click();
+    await card.locator('input').fill('Новое сохранённое значение');
+    await card.getByRole('button',{name:'Сохранить',exact:true}).click();
+    await expect(card.getByRole('heading',{name:'Новое сохранённое значение'})).toBeVisible();
+    expect(api.content.feature3_title_ru).toBe('Новое сохранённое значение');
+    release();
+    await expect(page.getByText('Контроль завершённой загрузки',{exact:true})).toBeVisible();
+    await expect(card.getByRole('heading',{name:'Новое сохранённое значение'})).toBeVisible();
+  } finally { release(); }
+});
+
 test('renaming keeps the slug; archiving never deletes questions and can be reversed', async ({ page, api }) => {
   await login(page);
   await page.goto('/admin/tests?editTest=' + api.test.id);
