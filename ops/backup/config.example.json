@@ -1,0 +1,10 @@
+{
+  "project": "afsoyuczexiztsjntkvi",
+  "pg_host": "db.afsoyuczexiztsjntkvi.supabase.co",
+  "pg_user": "postgres",
+  "pg_passfile": "/run/credentials/inner-code-backup.service/db.pgpass",
+  "pg_ssl_root_cert": "/etc/inner-code-backup/supabase-ca.crt",
+  "storage_key_file": "/run/credentials/inner-code-backup.service/storage-key",
+  "age_recipient": "REPLACE_WITH_PUBLIC_AGE_RECIPIENT_ONLY",
+  "output_directory": "/var/lib/inner-code-backup"
+}

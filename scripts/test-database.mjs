@@ -17,7 +17,7 @@ function docker(args, quiet = false) {
   if (!quiet && result.stdout) process.stdout.write(result.stdout);
   return result.stdout?.trim();
 }
-const temp = resolve(root, 'node_modules/.tmp/database-test');
+const temp = resolve(root, 'node_modules/.tmp/database-test', runId);
 mkdirSync(temp, { recursive: true });
 // Minimal platform schemas expose the same SQL boundary used by our functions.
 // This executes real PostgreSQL/RLS; it does not emulate Supabase HTTP services.
@@ -111,6 +111,48 @@ try {
   docker(['exec',container,'psql','-U','postgres','-d','app_test','-v','ON_ERROR_STOP=1','-f','/retire-legacy.sql'],true);
   docker(['exec',container,'psql','-U','postgres','-d','app_test','-v','ON_ERROR_STOP=1','-f','/tests/retired_submission.sql'],true);
   console.log('PASS: release cutover closes the legacy submission bypass and preserves anonymous pinned attempts.');
+  // Exercise the real recovery path: pg_dump -> tar + age encryption ->
+  // authenticated safe extraction -> pg_restore into a fresh isolated database.
+  // Cluster roles already exist here, as platform roles do in a new Supabase
+  // project. roles.sql is archived for review, never blindly replayed over them.
+  docker(['exec',container,'psql','-U','postgres','-d','app_test','-v','ON_ERROR_STOP=1','-c',`
+    insert into public.tests(id,title,slug,price_cents,is_active,archived_at)
+    values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Archived backup fixture','archived-backup',200,false,now());
+    insert into storage.objects(id,bucket_id,name)
+    values('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','images','nested/фото #1.gif');`],true);
+  docker(['exec',container,'pg_dump','-U','postgres','-d','app_test','-Fc','-f','/fixture.dump'],true);
+  docker(['exec',container,'pg_dumpall','-U','postgres','--roles-only','--no-role-passwords','-f','/fixture-roles.sql'],true);
+  docker(['cp',`${container}:/fixture.dump`,resolve(temp,'database.dump')],true);
+  docker(['cp',`${container}:/fixture-roles.sql`,resolve(temp,'roles.sql')],true);
+  const recovery=resolve(temp,'recovered');
+  const backupTest=spawnSync(process.execPath,[resolve(root,'scripts/test-backup.mjs'),
+    '--database-dump',resolve(temp,'database.dump'),'--roles',resolve(temp,'roles.sql'),
+    '--recovery-directory',recovery],{cwd:root,stdio:'inherit',timeout:180000});
+  if(backupTest.status!==0)throw new Error(`Encrypted backup recovery failed: ${backupTest.error??backupTest.status}`);
+  docker(['cp',resolve(recovery,'database.dump'),`${container}:/recovered.dump`],true);
+  docker(['exec',container,'createdb','-U','postgres','app_restored'],true);
+  docker(['exec',container,'pg_restore','-U','postgres','-d','app_restored','--exit-on-error','--single-transaction','/recovered.dump'],true);
+  const fingerprint=`select jsonb_build_object(
+    'tests',(select jsonb_agg(to_jsonb(t) order by id) from public.tests t),
+    'questions',(select jsonb_agg(to_jsonb(t) order by id) from public.questions t),
+    'sessions',(select jsonb_agg(to_jsonb(t) order by id) from public.test_sessions t),
+    'orders',(select jsonb_agg(to_jsonb(t) order by id) from public.checkout_orders t),
+    'mail',(select jsonb_agg(to_jsonb(t) order by id) from public.result_email_outbox t),
+    'attempts',(select jsonb_agg(to_jsonb(t) order by id) from public.test_attempts t),
+    'versions',(select jsonb_agg(to_jsonb(t) order by id) from public.test_versions t),
+    'settings',(select jsonb_agg(to_jsonb(t) order by key) from public.app_settings t),
+    'storage_buckets',(select jsonb_agg(to_jsonb(t) order by id) from storage.buckets t),
+    'storage_objects',(select jsonb_agg(to_jsonb(t) order by id) from storage.objects t),
+    'policies',(select jsonb_agg(to_jsonb(t) order by schemaname,tablename,policyname) from pg_policies t where schemaname in ('public','storage')),
+    'private_rls',(select bool_and(relrowsecurity) from pg_class where oid in ('public.checkout_orders'::regclass,'public.result_email_outbox'::regclass,'public.test_attempts'::regclass,'public.test_versions'::regclass)),
+    'private_read',has_table_privilege('anon','public.result_email_outbox','select'),
+    'legacy_open',has_function_privilege('anon','public.submit_test_session(uuid,text,jsonb)','execute')
+  );`;
+  const sourceFingerprint=docker(['exec',container,'psql','-U','postgres','-d','app_test','-At','-v','ON_ERROR_STOP=1','-c',fingerprint],true);
+  const restoredFingerprint=docker(['exec',container,'psql','-U','postgres','-d','app_restored','-At','-v','ON_ERROR_STOP=1','-c',fingerprint],true);
+  if(sourceFingerprint!==restoredFingerprint)throw new Error('Restored database data/policies/grants differ from source');
+  docker(['exec',container,'psql','-U','postgres','-d','app_restored','-v','ON_ERROR_STOP=1','-f','/tests/retired_submission.sql'],true);
+  console.log('PASS: age-encrypted backup restores real PostgreSQL data, RLS/policies/grants, pinned attempts and private payment/mail state; fixture Storage bytes match their hashes.');
   console.log('PASS: clean migration chain, scoring, unpaid/paid disclosure, RLS, archive and Storage policy contracts.');
 } finally {
   // Remove only the isolated container created by this exact invocation.
