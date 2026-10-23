@@ -8,8 +8,8 @@
     "legacyDirectMailerVersion": 8,
     "stripeWebhookDeployed": false,
     "frontendReleased": false,
-    "cloudflareVersion": "f4c796ed-b067-4ba6-a6c9-32d70c6b8fbf",
-    "mailMode": "preflight-v1",
+    "cloudflareVersion": "42e477c3-3363-4166-a588-55e0b040a1db",
+    "mailMode": "outbox-v1",
     "schedules": [
       {
         "cron": "17 */6 * * *",
@@ -78,15 +78,44 @@
     "edgeTypechecksAndBundles": 5,
     "exactBundleWorkerd": "passed; all outbound calls intercepted",
     "lint": "passed",
-    "persistedIsolatedCliLogin": "verified in two fresh invocations; exact project/name/organization guard"
+    "persistedIsolatedCliLogin": "verified in two fresh invocations; exact project/name/organization guard",
+    "fullCi": {
+      "commit": "db83bee420eafa1e608374b51883fd743a693f30",
+      "url": "https://github.com/stripeiqtests/stripeiqtests.github.io/actions/runs/39935536235",
+      "conclusion": "success",
+      "browserTests": 56,
+      "edgeTests": 16
+    }
   },
   "boundaries": {
-    "actualDispatch": "not enabled; explicit approval required after automatic approval review rejected a call that could send real email",
+    "actualDispatch": "enabled with explicit approval; real scheduled empty-queue run passed",
     "providerAcceptance": "not tested",
     "inboxDelivery": "not tested",
     "noTestPaymentOrResultOrEmail": true,
     "authoredCopy": "unchanged",
-    "pending": "dispatch approval, actual scheduled processing evidence; remaining checkout/webhook/frontend release tracked separately"
+    "pending": "Provider/inbox delivery untested with empty queue; remaining checkout/webhook/frontend release tracked separately"
   },
-  "recovery": "Keep isolated local CLI home; do not read shared Credential Manager. Preserve outbox and paid access. Preflight reports use separate KV and cannot overwrite delivery failures."
+  "recovery": "Keep isolated local CLI home; do not read shared Credential Manager. Preserve outbox and paid access. Preflight reports use separate KV and cannot overwrite delivery failures.",
+  "activation": {
+    "explicitUserApproval": "Enable queued copies for addresses entered by users, every two minutes, at most five per run; no arbitrary test email",
+    "verifiedAt": "2026-10-23T10:01:38.558292+00:00",
+    "cloudflareVersion": "42e477c3-3363-4166-a588-55e0b040a1db",
+    "scheduledReport": {
+      "checked_at": "2026-10-23T10:00:13.372Z",
+      "last_success_at": "2026-10-23T10:00:13.372Z",
+      "status": "ok",
+      "processed": 0,
+      "sent": 0,
+      "attempts": 1
+    },
+    "publicHealth": {
+      "curlStatus": 200,
+      "curlBody": {
+        "ok": true
+      },
+      "pythonUrllibStatus": 403,
+      "pythonUrllibError": "Cloudflare 1010; client-specific block"
+    },
+    "temporarySecretMaterial": "removed after installation; isolated CLI auth retained with user-only inherited ACL"
+  }
 }

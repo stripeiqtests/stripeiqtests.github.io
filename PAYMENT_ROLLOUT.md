@@ -3,8 +3,10 @@
 This is a reviewable release procedure, not evidence that deployment happened.
 The database migration was explicitly approved and applied on 2026-10-22; its
 seven read-only production checks passed. The private `result-email-worker` was deployed on 2026-10-23 with a dedicated
-secret and a successful scheduled read-only readiness check. Actual dispatch
-is held pending explicit approval. `verify-payment` version 13 is deployed: it
+secret and a successful scheduled read-only readiness check. The user then
+explicitly approved automatic queued dispatch. Cloudflare `outbox-v1` is enabled;
+a real scheduled run passed at 10:00:13 UTC with processed=0/sent=0. Provider
+acceptance/inbox delivery remain untested because the queue was empty. `verify-payment` version 13 is deployed: it
 commits paid access/outbox without waiting for the provider and preserves
 already-paid legacy results without re-enqueueing historical mail. Remaining
 payment functions, Stripe webhook setup and frontend release are tracked separately.
@@ -50,9 +52,9 @@ metadata; current editable test prices are not used to reject those payments.
   commit paid access + outbox and return without contacting the mail provider.
   Store it as an encrypted Cloudflare Worker secret, never in the repository or
   the public health check. No VPS or systemd service is needed. Follow
-  `ops/scheduler/README.md`; `MAIL_ENABLED=preflight-v1` performs only protected readiness reads; actual
-  `outbox-v1` delivery remains held until the matching
-  Supabase function and secret are verified and explicit dispatch approval is received.
+  `ops/scheduler/README.md`; `MAIL_ENABLED=outbox-v1` is now explicitly approved,
+  deployed and verified by a real scheduled empty-queue run. `preflight-v1`
+  remains available for protected readiness reads without claims/sends.
   The monitor/notification destination is not chosen yet; do not send messages.
 - Never paste real secret values into chat, source, shell history or screenshots.
   Credential entry/creation in the browser is a user handoff when required.

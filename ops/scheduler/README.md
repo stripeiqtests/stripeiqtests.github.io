@@ -7,17 +7,18 @@ Do not create a duplicate or use the global CLI token for the unrelated account
 `d08aef3b51fc374db9c4eb76f63ac3f3`.
 
 Status: health cutover first passed with version
-`8e34c58b-9552-4bd2-88c2-b0f1ee8ddab5`; current readiness release is
-`f4c796ed-b067-4ba6-a6c9-32d70c6b8fbf`.
+`8e34c58b-9552-4bd2-88c2-b0f1ee8ddab5`; current mail release is
+`42e477c3-3363-4166-a588-55e0b040a1db` after explicit dispatch approval.
 A real Cloudflare scheduled health run passed at 08:59:08 UTC on 2026-10-23
 (11:59:08 Europe/Minsk), persisted in KV, 3 ms CPU. Public status returns 200.
 The old IQ Tests VPS timer is disabled/inactive; Telegraph services stay active.
 Temporary minute scheduling was removed; stale probe invocations stop doing work
 after their ten-minute window even during Cron propagation. The private `result-email-worker` endpoint is deployed and rejects public calls.
-The scheduled mail path currently uses `MAIL_ENABLED=preflight-v1`: only
-`{"dryRun":true}` readiness reads run, with no claims, writes or provider calls.
-Its first real Cloudflare readiness report passed at 09:46:26 UTC on 2026-10-23,
-with an empty queue. Actual delivery (`outbox-v1`) awaits explicit approval.
+The scheduled mail path now uses approved `MAIL_ENABLED=outbox-v1`. Its first
+real delivery-mode run passed at 10:00:13 UTC on 2026-10-23 (13:00 Minsk),
+processed=0/sent=0 because the queue was empty. Actual provider/inbox delivery
+therefore remains untested. The preceding readiness report passed at 09:46:26
+UTC; `preflight-v1` remains a diagnostic mode with no claims/writes/provider calls.
 `verify-payment` version 13 now commits paid access/outbox without inline mail.
 Already-paid legacy results retain their existing capability and do not enqueue
 a historical copy. Fresh-process CLI checks verified the saved isolated login
@@ -30,8 +31,8 @@ the preceding `audit/monitoring-cloudflare-2026-10-23.json`.
   active test ID through the Data API without caching, homepage, static question
   GIF and a bounded public Storage sample. An empty bucket explicitly skips
   object download. No uploads, simulated users, results, writes or fake commits.
-- `*/2 * * * *`: at most 720 mail calls/day, **delivery held during preflight**. After the
-  coordinated release, POST `{}` to `result-email-worker` with its dedicated
+- `*/2 * * * *`: at most 720 mail calls/day, **delivery enabled with explicit approval**.
+  POST `{}` to `result-email-worker` with its dedicated
   `RESULT_EMAIL_WORKER_SECRET`. Each call handles at most five due jobs; database
   leases, retry limits and provider idempotency remain in force. The scheduler
   never receives a service-role key, Stripe/Resend key, result token, recipient,

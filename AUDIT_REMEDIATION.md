@@ -24,7 +24,8 @@ tables have RLS; anon/authenticated cannot read them or execute the seven privat
 RPCs; service_role can execute them; owned context is available; wrong capability
 returns none; unpaid answers/scores remain hidden; no orders or mail jobs were
 created by applying the patch. The verification producer and private queue
-endpoint were subsequently deployed; automatic mail dispatch, remaining payment
+endpoint were subsequently deployed; automatic mail dispatch was explicitly
+approved and its real scheduled empty-queue run passed. Remaining payment
 functions/webhook and frontend release are still pending. Do not reapply this
 migration's CREATE statements.
 
@@ -60,7 +61,7 @@ The matched frontend and functions are still pending release. See
 | A10 admin validation | Price/options/correct answer/number validation, save locks and errors; image format/signature/decode/size/dimensions validated | Broader validation coverage and release |
 | A11 changing slug | Existing slug retained on title change; browser test | Release |
 | A12 live question mutation | Private immutable question/scoring/price versions; archive resume; SQL + browser tests, concurrent submission test; migration applied; real preview started/resumed the attempt and loaded all 21 questions | Release frontend; finish approved production submission smoke test |
-| A13 email failures | Durable leased outbox, frozen provider payload and bounded retries; private worker/secret and verification producer deployed; real two-minute readiness checks pass with empty queue; legacy paid results do not re-enqueue historical copies | Explicit approval to enable automatic dispatch; provider/inbox delivery verification; failure alerts |
+| A13 email failures | Durable leased outbox, frozen payload and bounded retries; private worker/secret and verification producer deployed; automatic dispatch approved/enabled; actual scheduled run passed at 10:00 UTC with processed=0/sent=0; legacy paid results do not re-enqueue historical copies | Provider/inbox delivery verification when mail exists; failure alerts |
 | A14 score interpretation | Original score thresholds and single-leader descriptions preserved; user-approved default state messages; admin-controlled mixed/priority ties, zero fallback and bilingual messages; shared selection for result/archetype/email, preview, atomic saves and failure recovery | Presentation migration applied; deploy matching functions/frontend; editorial reinterpretation remains excluded without approval |
 | A15 tracking consent | No eager tracking, explicit allow/decline/revoke; browser network test; Inter now self-hosted | Release |
 | A16 banner overlap | Consent in document flow; mobile browser test | Release |
@@ -80,7 +81,9 @@ The matched frontend and functions are still pending release. See
 
 ## Validation already exercised
 
-- Queue rollout follow-up: 16 Edge tests, five entry-point checks/bundles, 15 scheduler cases, exact-bundle workerd and lint passed. The actual Cloudflare readiness report succeeded at 09:50:29 UTC on 2026-10-23; it cannot claim jobs or contact Resend. Public worker calls returned 403; deployed verification rejected an invalid request with 400. The new isolated CLI login persisted across fresh processes. Actual provider delivery remains untested and disabled pending approval. See `audit/mail-queue-rollout-2026-10-23.json`.
+- Queue activation: the user explicitly approved automatic queued copies (at most five per two-minute run). Version `42e477c3-3363-4166-a588-55e0b040a1db` was deployed after the 15 scheduler and exact-bundle runtime gates passed. The real 10:00:13 UTC run succeeded with processed=0/sent=0; no fabricated status or test email was used. curl public health returned 200/ok; Python urllib was blocked by Cloudflare 1010. Full CI for `db83bee` passed all 56 browser tests, 16 Edge tests and SQL/backup/security/build checks ([39935536235](https://github.com/stripeiqtests/stripeiqtests.github.io/actions/runs/39935536235)).
+
+- Pre-activation queue follow-up: 16 Edge tests, five entry-point checks/bundles, 15 scheduler cases, exact-bundle workerd and lint passed. The actual Cloudflare readiness report succeeded at 09:50:29 UTC on 2026-10-23; it cannot claim jobs or contact Resend. Public worker calls returned 403; deployed verification rejected an invalid request with 400. The new isolated CLI login persisted across fresh processes. At that stage actual dispatch was held pending approval; it is now enabled as recorded above, while provider/inbox delivery remains untested. See `audit/mail-queue-rollout-2026-10-23.json`.
 
 - Payment-confirmation follow-up: the return-page server no longer waits for email delivery after committing access/outbox. A new actual-handler fixture failed before the fix (extra mail claim) and passed after it; all 14 Edge tests, four entry-point typechecks/bundles and lint passed. A configured private worker is a production release gate. See `audit/payment-confirmation-queue-2026-10-23.json`.
 - Full Linux CI passed for `2d9dd49`, including all 56 browser tests, 13 Edge tests, PostgreSQL/backup and security/build gates ([39920439401](https://github.com/stripeiqtests/stripeiqtests.github.io/actions/runs/39920439401)).
@@ -114,9 +117,10 @@ The matched frontend and functions are still pending release. See
 ## Payment rollout boundary
 
 See `PAYMENT_ROLLOUT.md`. The payment migration, verification producer and
-private queue endpoint/secret are deployed. The Cloudflare schedule currently
-checks readiness only. Actual dispatch awaits explicit approval; remaining
-checkout/webhook and frontend release need coordinated integration evidence.
+private queue endpoint/secret are deployed. Automatic Cloudflare queued dispatch
+is explicitly approved/enabled; the actual scheduled empty-queue run passed.
+Provider/inbox delivery is untested; remaining checkout/webhook and frontend
+release need coordinated integration evidence.
 Free-tier keep-alive reduces pause risk; it cannot guarantee a free project remains active.
 
 `ATTEMPT_ROLLOUT.md` describes the applied pinned-attempt migration and the
@@ -161,6 +165,7 @@ prevents delayed probe events from performing work beyond ten minutes. Public
 health returned HTTP200. Only the IQ VPS timer was disabled; both Telegraph
 services remained active. Subsequent mail preparation deployed the private
 function/secret and verification producer. The real two-minute schedule now
-checks readiness only; actual dispatch awaits explicit approval.
+was subsequently explicitly approved for actual dispatch; its 10:00:13 UTC run
+passed with processed=0/sent=0. Provider/inbox delivery was not exercised.
 No new payment, result, email or authored-copy changes occurred in this cutover.
 See `audit/monitoring-cloudflare-2026-10-23.json`.

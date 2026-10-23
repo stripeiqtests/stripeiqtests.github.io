@@ -6,7 +6,8 @@
 > below. The explicitly approved `20261022190000_audit_safety.sql` and
 > `20261022200000_payment_fulfillment.sql` have been applied and verified.
 > `verify-payment` and the private queue endpoint are deployed; automatic mail
-> dispatch awaits approval. Remaining payment functions/webhook/frontend release
+> dispatch is enabled and a scheduled empty-queue run passed. Remaining
+> payment functions/webhook/frontend release
 > remain pending. See `audit/mail-queue-rollout-2026-10-23.json`.
 
 The application is a static React frontend backed by Supabase, Stripe and
