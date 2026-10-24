@@ -23,6 +23,10 @@ export interface Fulfillment {
   resultAccessToken: string;
   alreadyProcessed: boolean;
 }
+// PostgreSQL also accepts older test IDs without RFC version/variant bits.
+// Keep the stricter validator for generated order/session IDs and capabilities.
+const testIdentifier =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Values must come from Stripe's server API, never an unsigned browser/event.
 export function paymentFacts(checkout: Stripe.Checkout.Session) {
   const m = checkout.metadata;
@@ -33,7 +37,7 @@ export function paymentFacts(checkout: Stripe.Checkout.Session) {
     !checkoutId.test(checkout.id) || checkout.mode !== "payment" ||
     checkout.status !== "complete" ||
     checkout.currency !== "usd" || !m || !uuid.test(m.testSessionId || "") ||
-    !uuid.test(m.testId || "") ||
+    !testIdentifier.test(m.testId || "") ||
     !/^\d+$/.test(m.expectedAmount || "") || !Number.isSafeInteger(expected) ||
     expected < 50 || expected > 100000 ||
     !Number.isSafeInteger(subtotal) || !Number.isSafeInteger(total) ||

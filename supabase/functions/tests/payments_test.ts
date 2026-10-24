@@ -120,6 +120,33 @@ Deno.test("canonical Stripe facts accept normal, discounted, free-promo and lega
   delete legacy.metadata!.orderId;
   assert.equal(paymentFacts(legacy).orderId, null);
 });
+Deno.test("verification fulfills a paid checkout for a legacy PostgreSQL test UUID", async () => {
+  // Existing PostgreSQL IDs can predate UUID version/variant conventions used
+  // for newly generated capabilities. The actual release smoke test found one.
+  const legacyTestId = "12345678-1234-2234-1234-123456789abc";
+  const paid = checkout();
+  paid.metadata!.testId = legacyTestId;
+  let fulfillments = 0;
+  const handler = createVerificationHandler(() => ({
+    db: dbStub((name, args) => {
+      assert.equal(name, "fulfill_checkout");
+      assert.equal(args.p_test_id, legacyTestId);
+      assert.equal(args.p_order_id, orderId);
+      fulfillments++;
+      return Promise.resolve({ success: true, resultAccessToken: accessToken });
+    }),
+    stripe: {
+      checkout: { sessions: { retrieve: () => Promise.resolve(paid) } },
+    } as unknown as Stripe,
+  }));
+  const response = await handler(new Request("https://fixture", {
+    method: "POST",
+    body: JSON.stringify({ stripeSessionId: paid.id }),
+  }));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).resultAccessToken, accessToken);
+  assert.equal(fulfillments, 1);
+});
 Deno.test("invalid or incomplete payments cannot reach the fulfillment RPC", async () => {
   const changes: Partial<Stripe.Checkout.Session>[] = [
     { status: "open" },
@@ -133,6 +160,8 @@ Deno.test("invalid or incomplete payments cannot reach the fulfillment RPC", asy
     { amount_total: 0, payment_status: "no_payment_required" },
     { metadata: { ...checkout().metadata, expectedAmount: "0" } },
     { metadata: { ...checkout().metadata, orderId: "invalid" } },
+    { metadata: { ...checkout().metadata, testId: "invalid" } },
+    { metadata: { ...checkout().metadata, testId: "12345678-1234-2234-1234-123456789abc&select=*" } },
     {
       total_details: { amount_discount: 0, amount_tax: 10, amount_shipping: 0 },
     },
