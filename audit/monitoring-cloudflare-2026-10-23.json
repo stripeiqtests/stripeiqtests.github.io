@@ -1,0 +1,118 @@
+{
+  "target": {
+    "cloudflare_account": "93995a2ee892a5f3efa03bf62c2d31b9",
+    "worker": "supabase-read-health",
+    "supabase_project": "afsoyuczexiztsjntkvi"
+  },
+  "previous": {
+    "version": "acc2faba-d103-482e-b61d-d4779fab0030",
+    "source_sha256": "2010b6e7a753d0a26c456f563271943ea67c738d9e5a39e362158773930e36d3",
+    "schedule": "17 */6 * * *",
+    "behavior": "Public active-test SELECT; no Storage/site checks; no persisted freshness; logs disabled. Source/settings saved outside repository before replacement."
+  },
+  "deployment": {
+    "version": "8e34c58b-9552-4bd2-88c2-b0f1ee8ddab5",
+    "created_at": "2026-10-23T08:37:39.852608Z",
+    "verified_at": "2026-10-23T08:41:27.503448Z",
+    "traffic_percent": 100,
+    "kv_namespace": "80a6a5eabf0a45c0b261ac2be4ade4a4",
+    "crons": [
+      "17 */6 * * *",
+      "*/2 * * * *"
+    ],
+    "mail_enabled": false,
+    "logs_enabled": true,
+    "health_verified_at": "2026-10-23T08:59:08.944Z"
+  },
+  "checks": {
+    "isolated_scheduler_cases": 14,
+    "scheduler_bundle": "passed, 9.20KiB / gzip3.23KiB",
+    "lint": "passed",
+    "security_regression": "passed",
+    "hosting_cases": 2,
+    "dependency_audit": "no known advisories",
+    "local_live_read_only_preflight": {
+      "checks": [
+        "active_test_database_read",
+        "homepage",
+        "question_illustration",
+        "storage_listing"
+      ],
+      "skipped": [
+        {
+          "check": "storage_object_download",
+          "reason": "bucket_empty"
+        }
+      ]
+    },
+    "workerd_exact_bundle": "passed: real Fetch/stream/KV APIs with fully intercepted outbound requests; initial missing state503, actual read-only checks200, disabled mail, HTTP302 rejected, failed state503 preserves last success",
+    "prior_full_ci": {
+      "commit": "9dedacf",
+      "run": "39926729102",
+      "result": "success"
+    },
+    "final_full_ci": "pending"
+  },
+  "pending": [
+    "Matching private Supabase function/worker secret and controlled queue test; mail remains disabled",
+    "Existing UptimeRobot alert destination/delivery verification",
+    "Live encrypted off-site backup and isolated hosted restore drill"
+  ],
+  "approval_review": {
+    "preflight_KV_seed": "rejected; not executed; no synthetic green production report written",
+    "temporary_probe_schedule": "separately approved by user, executed, removed; worker-side ten-minute cap also enforced"
+  },
+  "source_sha256": {
+    "ops/scheduler/index.mjs": "9efeff802775235d4c25d7b432c90134ac378264d01e147548b7aa060f167522",
+    "ops/scheduler/worker.mjs": "59b9191614668ef0a130cf1faeeb2534d40a0061156c737e29394c1bc5f1441c",
+    "ops/scheduler/wrangler.json": "53b350fe1e3c63a42fd5373442066fde1d90affa1d6b100d5ade24f55ae89ac7",
+    "ops/scheduler/worker.test.mjs": "fb366d0acd20e706282c82f14277786671ae9432bd0fee51262d15b5a6b2bd6f",
+    "scripts/scheduler-runtime.mjs": "4359e461de65a0d17377eb005a1314a2a58e11a5c5a5db9653802d8bfbc5073e"
+  },
+  "production_probe": {
+    "explicit_user_approval": true,
+    "started_at": "2026-10-23T08:49:53.894384Z",
+    "normal_crons_restored": true,
+    "expired_probe_is_noop": true,
+    "no_synthetic_status_seeded": true,
+    "initial_failures": "Workers Fetch rejects redirect:error; actual runtime also rejects named constant entry exports. Fixed manual redirect/status rejection and isolated default entry point.",
+    "successful_report": {
+      "checked_at": "2026-10-23T08:59:08.944Z",
+      "last_success_at": "2026-10-23T08:59:08.944Z",
+      "status": "ok",
+      "checks": [
+        "active_test_database_read",
+        "homepage",
+        "question_illustration",
+        "storage_listing"
+      ],
+      "skipped_checks": [
+        {
+          "check": "storage_object_download",
+          "reason": "bucket_empty"
+        }
+      ],
+      "attempts": 1
+    },
+    "cpu_ms": 3,
+    "wall_ms": 3474,
+    "public_status": {
+      "url": "https://supabase-read-health.adrianwalshly.workers.dev/health/supabase",
+      "http": 200,
+      "body": {
+        "ok": true
+      }
+    },
+    "existing_watchdog": "UptimeRobot requests observed; alert contact/delivery not inspected"
+  },
+  "vps_cutover": {
+    "host": "95.182.96.230",
+    "timer": "inner-code-health.timer",
+    "unit_file_state": "disabled",
+    "active_state": "inactive",
+    "service_active_state": "inactive",
+    "telegraph_monitor": "active",
+    "telegraph_urlscan": "active",
+    "files_retained": true
+  }
+}

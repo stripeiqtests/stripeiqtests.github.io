@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-23",
+  "timezone": "Europe/Minsk",
+  "project": "afsoyuczexiztsjntkvi",
+  "project_name": "IQ Tests",
+  "organization": "IQ Test / lkfbwyobqggwoysluiri",
+  "postgres_version": "17.6",
+  "migration": "20261023073000_result_presentation.sql",
+  "sha256": "3d72b146dbc99db50c733c995f9f460520b2df021073e844ba1e9b022cab6a0c",
+  "approval": "User separately approved this exact new production SQL patch in chat.",
+  "application": "Dashboard SQL editor; pasted text compared exactly before execution; Success. No rows returned.",
+  "before": {
+    "tests": 2,
+    "questions": 21,
+    "results": 6,
+    "presentation_exists": false,
+    "size_constraint_exists": false
+  },
+  "after": {
+    "tests": 2,
+    "questions": 21,
+    "results": 6
+  },
+  "checks": {
+    "default_rules": true,
+    "saved_email_copy_preserved": true,
+    "presentation_size_constraint": true,
+    "public_settings_projection": true,
+    "admin_only_settings_writes": true,
+    "worker_reads_archetypes": true,
+    "tests_preserved_2": true,
+    "questions_preserved_21": true,
+    "results_preserved_6": true
+  },
+  "public_http_read": {
+    "presentation_readable": true,
+    "defaults_valid": true,
+    "private_admission_settings_hidden": true,
+    "writes_performed": false
+  },
+  "screenshot": {
+    "filename": "presentation-production-verified-2026-10-23.png",
+    "sha256": "5ea741eec5cb8051449d3f8e76135841704d942c1c2d80cd8416d7bda1da1a22"
+  },
+  "release_boundary": "No Edge deployment, QA result creation, payment, email or frontend publication. Existing result and authored copy preserved. Do not replay the named-constraint migration."
+}

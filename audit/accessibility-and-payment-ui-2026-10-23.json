@@ -1,0 +1,34 @@
+{
+  "environment": "Local Vite application, isolated browser API fixtures, Chromium, 390x844 viewport",
+  "production_changed": false,
+  "full_browser_tests_passed_before_final_test_addition": 43,
+  "affected_tests_passed_after_final_test_addition": 12,
+  "full_ci_browser_tests_passed": 44,
+  "ci_source_commit": "61e867886f508e7d5d75a8676797a148d363e0bd",
+  "ci_run": "https://github.com/stripeiqtests/stripeiqtests.github.io/actions/runs/39905225998",
+  "contrast_followup_affected_tests_passed": 7,
+  "accessibility_engine": "axe-core 4.14.0",
+  "disabled_rules": [],
+  "excluded_selectors": [],
+  "screen_states_with_zero_detected_violations": [
+    "home", "question", "submit-form", "login", "question-editor", "settings",
+    "password-dialog", "paywall", "paid-result", "result-error", "privacy", "terms",
+    "payment-cancel", "admin-paywall", "admin-paywall-editing"
+  ],
+  "manual_contrast_review_still_required": ["home", "question", "privacy", "terms", "paid-result", "password-dialog"],
+  "keyboard_checks_passed": [
+    "Password dialog prevents background controls receiving focus; Escape returns focus to opener",
+    "Inline editor opens with Enter; Escape cancels and returns focus to same edit button",
+    "Inline confirmation controls remain absolutely positioned",
+    "Language buttons expose selected state"
+  ],
+  "payment_checks_passed": [
+    "Delayed previous verification cannot replace a changed return URL",
+    "Delayed checkout cannot redirect after leaving the result",
+    "Verification timeout exposes retry without demanding another payment",
+    "Broken optional analytics cannot block test answers or checkout",
+    "Concurrent purchase events deduplicate with session storage unavailable; raw checkout capability is not sent",
+    "Successful fixture verification opens the protected paid result; repeat return-page visit does not duplicate purchase analytics and uses the actual amount paid"
+  ],
+  "limitations": "Automated fixture checks do not establish full WCAG conformance, a complete screen-reader/device audit, or a real Stripe/Resend round trip. Live configurable copy is not replaced by these tests."
+}

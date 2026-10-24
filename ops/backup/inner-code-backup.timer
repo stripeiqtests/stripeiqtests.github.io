@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly encrypted IQ Tests backup outside Supabase
+
+[Timer]
+OnCalendar=Sun *-*-* 03:42:00 UTC
+RandomizedDelaySec=10min
+Persistent=true
+Unit=inner-code-backup.service
+
+[Install]
+WantedBy=timers.target

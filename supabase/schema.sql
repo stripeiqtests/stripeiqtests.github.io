@@ -22,6 +22,7 @@ create table if not exists public.tests (
   description text,
   price_cents integer default 500 check (price_cents between 50 and 100000),
   is_active boolean default false,
+  archived_at timestamptz,
   created_at timestamptz default now()
 );
 
@@ -86,7 +87,7 @@ grant execute on function public.is_admin() to anon, authenticated;
 create policy "Public settings projection"
   on public.app_settings for select
   to anon, authenticated
-  using (key in ('language_mode', 'follow_up_test_slug'));
+  using (key in ('language_mode', 'follow_up_test_slug', 'support_contact'));
 
 create policy "Admin manages settings"
   on public.app_settings for all
@@ -226,9 +227,14 @@ stable
 security definer
 set search_path = public, pg_temp
 as $$
-  select s.id, s.test_id, s.email, s.answers, s.analyst_score,
-         s.strategist_score, s.observer_score, s.intuitive_score,
-         s.overall_score, s.is_paid, s.stripe_session_id,
+  select s.id, s.test_id, s.email,
+         case when s.is_paid or public.is_admin() then s.answers end,
+         case when s.is_paid or public.is_admin() then s.analyst_score end,
+         case when s.is_paid or public.is_admin() then s.strategist_score end,
+         case when s.is_paid or public.is_admin() then s.observer_score end,
+         case when s.is_paid or public.is_admin() then s.intuitive_score end,
+         case when s.is_paid or public.is_admin() then s.overall_score end,
+         s.is_paid, s.stripe_session_id,
          s.completed_at, s.created_at
   from public.test_sessions s
   where s.id = p_session_id

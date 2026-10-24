@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { TestSession, Test, ArchetypeResult } from '../lib/supabase';
@@ -9,17 +9,22 @@ import { EditableField } from '../components/EditableField';
 import { trackBeginCheckout } from '../lib/analytics';
 import { useContent } from '../lib/useContent';
 import { RichInlineText, RichTextContent } from '../components/RichTextContent';
-import { readSessionAccess } from '../lib/sessionAccess';
+import { readSessionAccess, resultPath } from '../lib/sessionAccess';
+import { SupportLink } from '../components/SupportLink';
+import { getScoreInterpretation, getProfileDescription } from '../lib/resultSummary';
+import { usePresentation } from '../lib/usePresentation';
+import { selectProfile } from '../../supabase/functions/_shared/presentation.ts';
 
 export function Results() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [searchParams] = useSearchParams();
   const { t, lang } = useLanguage();
-  const { isAdmin } = useAdmin();
+  const { isAdmin,authLoading } = useAdmin();
   const { getContent, saveContent } = useContent();
+  const { presentation, loading: presentationLoading, error: presentationError, reload: reloadPresentation, save: savePresentation } = usePresentation();
 
   // Preview mode check
-  const isPreview = searchParams.get('preview') === 'admin';
+  const isPreview = isAdmin && searchParams.get('preview') === 'admin';
   const isPaywallPreview = sessionId === 'preview-paywall' && isPreview;
 
   // Mock data for results preview mode (paid)
@@ -29,6 +34,7 @@ export function Results() {
     email: 'demo@example.com',
     answers: '{}',
     is_paid: true,
+    email_status: 'sent',
     overall_score: 78,
     analyst_score: 85,
     strategist_score: 72,
@@ -66,29 +72,35 @@ export function Results() {
     created_at: new Date().toISOString(),
   };
 
-  const getInitialSession = () => {
-    if (isPaywallPreview) return mockPaywallSession;
-    if (isPreview) return mockSession;
-    return null;
-  };
-
-  const [session, setSession] = useState<TestSession | null>(getInitialSession());
-  const [test, setTest] = useState<Test | null>(isPreview || isPaywallPreview ? mockTest : null);
-  const [loading, setLoading] = useState(!isPreview && !isPaywallPreview);
+  const [loadedSession, setSession] = useState<TestSession | null>(null);
+  const [loadedTest, setTest] = useState<Test | null>(null);
+  const session=isPreview?(isPaywallPreview?mockPaywallSession:mockSession):loadedSession;
+  const test=isPreview?mockTest:loadedTest;
+  const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [archetypeResult, setArchetypeResult] = useState<ArchetypeResult | null>(null);
   const [followUpTestSlug, setFollowUpTestSlug] = useState<string | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [loadedAccessToken, setAccessToken] = useState<string | null>(null);
+  const accessToken=isPreview?null:loadedAccessToken;
+  const [accessError, setAccessError] = useState<'missing-token' | 'network' | 'missing' | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [showPersonalLink, setShowPersonalLink] = useState(false);
+  const [paymentError, setPaymentError] = useState(false);
+  const sessionRequest=useRef(0);
 
   useEffect(() => {
     loadFollowUpTestSlug();
   }, []);
 
   useEffect(() => {
-    if (sessionId && !isPreview) {
+    if (!authLoading && sessionId && !isPreview) {
       loadSession();
     }
-  }, [sessionId, isPreview]); // eslint-disable-line react-hooks/exhaustive-deps
+    // This is a request generation counter, not a DOM ref. Invalidate any
+    // request still in flight when the route changes or the component unmounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return ()=>{sessionRequest.current++;};
+  }, [sessionId, isPreview,authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadFollowUpTestSlug() {
     const { data: settingsData } = await supabase
@@ -102,32 +114,28 @@ export function Results() {
     }
   }
 
-  // Load archetype result based on strongest dimension
-  async function loadArchetypeResult(sess: TestSession) {
-    const scores = [
-      { dimension: 'analyst', score: sess.analyst_score || 0 },
-      { dimension: 'strategist', score: sess.strategist_score || 0 },
-      { dimension: 'observer', score: sess.observer_score || 0 },
-      { dimension: 'intuitive', score: sess.intuitive_score || 0 },
-    ];
-    const strongest = scores.reduce((max, s) => s.score > max.score ? s : max);
-
-    const { data, error } = await supabase
-      .from('archetype_results')
-      .select('*')
-      .eq('dimension', strongest.dimension)
-      .single();
-
-    if (!error && data) {
-      setArchetypeResult(data);
-    }
-  }
-
+  const selection = loadedSession?.is_paid && !presentationLoading && !presentationError ? selectProfile(loadedSession, presentation) : null;
+  const chosenDimension = selection?.kind === 'single' ? selection.leaders[0] : null;
+  useEffect(() => {
+    if (!chosenDimension) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    void supabase.from('archetype_results').select('*').eq('dimension',chosenDimension)
+      .retry(false).abortSignal(controller.signal).maybeSingle().then(({data,error})=>{
+        if (!controller.signal.aborted && !error) setArchetypeResult(data);
+      });
+    return () => { clearTimeout(timeout);controller.abort(); };
+  },[chosenDimension,loadedSession?.id]);
 
   async function loadSession() {
     if (!sessionId) return;
+    const request=++sessionRequest.current;
+    setLoading(true); setAccessError(null);setTest(null);setArchetypeResult(null);
+    setAccessToken(null);setProcessingPayment(false);setPaymentError(false);setShowPersonalLink(false);setLinkCopied(false);
+    try {
     const token = readSessionAccess(sessionId);
     if (!token) {
+      setAccessError('missing-token');
       setLoading(false);
       return;
     }
@@ -138,38 +146,51 @@ export function Results() {
         p_session_id: sessionId,
         p_access_token: token,
       })
+      .abortSignal(AbortSignal.timeout(8000))
       .single();
+
+    if(request!==sessionRequest.current)return;
 
     const sessionData = rawSessionData as TestSession | null;
 
     if (sessionError || !sessionData) {
+      setAccessError(sessionError?.code === 'PGRST116' || !sessionError ? 'missing' : 'network');
       setLoading(false);
       return;
     }
 
-    setSession(sessionData);
-
-    // Load archetype result based on scores
-    loadArchetypeResult(sessionData);
+    const {data:context,error:contextError} = await supabase.rpc('get_result_context', {
+      p_session_id:sessionId,p_access_token:token,
+    }).abortSignal(AbortSignal.timeout(8000)).maybeSingle<{test:Test;email_status:TestSession['email_status']}>();
+    if(request!==sessionRequest.current)return;
+    if(contextError)throw contextError;
+    const deliveryStatus = context?.email_status;
+    setSession({...sessionData,email_status:typeof deliveryStatus==='string' && ['pending','sending','sent','failed'].includes(deliveryStatus) ? deliveryStatus : null});
 
     // Load test info
-    const { data: testData } = await supabase
+    const { data: testData } = context?.test ? {data:context.test as Test} : await supabase
       .from('tests')
       .select('*')
       .eq('id', sessionData.test_id)
+      .retry(false)
+      .abortSignal(AbortSignal.timeout(8000))
       .single();
 
+    if(request!==sessionRequest.current)return;
     if (testData) {
       setTest(testData);
     }
 
-    setLoading(false);
+    }catch{if(request===sessionRequest.current)setAccessError('network');}
+    finally{if(request===sessionRequest.current)setLoading(false);}
   }
 
   async function handlePayment() {
-    if (!session || !test || !accessToken) return;
+    if (!session || !test || !accessToken || processingPayment) return;
+    const request=sessionRequest.current;
 
     setProcessingPayment(true);
+    setPaymentError(false);
 
     // Track checkout initiation
     trackBeginCheckout(test.id, test.price_cents);
@@ -180,25 +201,27 @@ export function Results() {
         body: {
           sessionId: session.id,
           accessToken,
+          language:lang,
         },
+        timeout:20000,
       });
 
+      if(request!==sessionRequest.current)return;
       if (error) throw error;
 
       // Redirect to Stripe checkout
-      if (data?.url) {
-        window.location.href = data.url;
-      }
-    } catch (err) {
-      console.error('Payment error:', err);
-      alert(lang === 'ru' ? 'Ошибка оплаты. Попробуйте еще раз.' : 'Failed to initiate payment. Please try again.');
-      setProcessingPayment(false);
+      if (!data?.url) throw new Error('Checkout URL is missing');
+      const checkoutUrl = new URL(data.url);
+      if (checkoutUrl.protocol !== 'https:' || checkoutUrl.hostname !== 'checkout.stripe.com') throw new Error('Invalid checkout URL');
+      window.location.href = checkoutUrl.href;
+    } catch {
+      if(request===sessionRequest.current){setPaymentError(true);setProcessingPayment(false);}
     }
   }
 
-  if (loading) {
+  if (authLoading || (!isPreview&&loading)) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="mt-4 text-gray-500">{t('common.loading')}</p>
@@ -207,22 +230,24 @@ export function Results() {
     );
   }
 
-  if (!session) {
+  if (!session || (!isPreview&&accessError)) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
           <Brain className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {lang === 'ru' ? 'Сессия не найдена' : 'Session Not Found'}
+            {accessError === 'missing-token' ? (lang === 'ru' ? 'Нужна персональная ссылка' : 'Your personal link is needed') : accessError === 'network' ? (lang === 'ru' ? 'Не удалось загрузить результат' : 'Could not load your result') : (lang === 'ru' ? 'Сессия не найдена' : 'Session not found')}
           </h1>
           <p className="text-gray-500 mb-6">
-            {lang === 'ru' ? 'Эта тестовая сессия не существует или истекла.' : "This test session doesn't exist or has expired."}
+            {accessError === 'missing-token' ? (lang === 'ru' ? 'В этой вкладке нет ключа доступа. Откройте сохранённую персональную ссылку. Если результат уже оплачен, обратитесь в поддержку — платить заново не нужно.' : 'This tab has no access key. Open your saved personal link. If you already paid, contact support; you do not need to pay again.') : (lang === 'ru' ? 'Проверьте подключение и исходную персональную ссылку. Сохранённые данные не удалены.' : 'Check your connection and original personal link. Saved data has not been deleted.')}
           </p>
+          {accessError === 'network' && <button className="mb-4 rounded-lg border border-indigo-600 px-4 py-2 text-indigo-700" onClick={() => void loadSession()}>{lang === 'ru' ? 'Повторить' : 'Retry'}</button>}
+          <p className="mb-5"><SupportLink /></p>
           <Link
             to="/"
             className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700"
           >
-            {lang === 'ru' ? 'Пройти новый тест' : 'Take a New Test'}
+            {lang === 'ru' ? 'На главную' : 'Back to Home'}
           </Link>
         </div>
       </div>
@@ -232,8 +257,9 @@ export function Results() {
   // Payment required
   if (!session.is_paid) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+          {paymentError && <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-red-800"><p>{lang === 'ru' ? 'Не удалось открыть оплату. Попробуйте ещё раз.' : 'Could not open checkout. Please retry.'}</p><SupportLink /></div>}
           {/* Language Switcher */}
           <div className="flex justify-end mb-4">
             <LanguageSwitcher />
@@ -296,13 +322,13 @@ export function Results() {
               <EditableField
                 value={getContent(lang === 'ru' ? 'paywall_includes_title_ru' : 'paywall_includes_title_en', lang === 'ru' ? 'Внутри полного результата:' : 'Inside your full results:')}
                 onSave={(value) => saveContent(lang === 'ru' ? 'paywall_includes_title_ru' : 'paywall_includes_title_en', value)}
-                as="h3"
+                as="h2"
                 className="font-medium text-gray-900 mb-4"
               />
             ) : (
-              <h3 className="font-medium text-gray-900 mb-4">
+              <h2 className="font-medium text-gray-900 mb-4">
                 {getContent(lang === 'ru' ? 'paywall_includes_title_ru' : 'paywall_includes_title_en', lang === 'ru' ? 'Внутри полного результата:' : 'Inside your full results:')}
-              </h3>
+              </h2>
             )}
             <ul className="space-y-3 text-sm text-gray-700">
               <li className="flex items-start gap-2">
@@ -385,7 +411,14 @@ export function Results() {
           </div>
 
           {/* Payment Button */}
-          <button
+          {isPaywallPreview ? <div className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-4 rounded-xl font-medium">
+            <CreditCard className="w-5 h-5" />
+            <EditableField
+              value={getContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', lang === 'ru' ? 'Разблокировать мой результат' : 'Unlock My Results')}
+              onSave={value=>saveContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en',value)}
+              as="span" className="text-white"
+            />
+          </div> : <button
             onClick={handlePayment}
             disabled={processingPayment || isPaywallPreview}
             className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-4 rounded-xl font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
@@ -398,21 +431,12 @@ export function Results() {
             ) : (
               <>
                 <CreditCard className="w-5 h-5" />
-                {isAdmin && isPaywallPreview ? (
-                  <EditableField
-                    value={getContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', lang === 'ru' ? 'Разблокировать мой результат' : 'Unlock My Results')}
-                    onSave={(value) => saveContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', value)}
-                    as="span"
-                    className="text-white"
-                  />
-                ) : (
-                  getContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', lang === 'ru' ? 'Разблокировать мой результат' : 'Unlock My Results')
-                )}
+                {getContent(lang === 'ru' ? 'paywall_button_ru' : 'paywall_button_en', lang === 'ru' ? 'Разблокировать мой результат' : 'Unlock My Results')}
               </>
             )}
-          </button>
+          </button>}
 
-          <p className="text-xs text-gray-400 text-center mt-4">
+          <p className="text-xs text-gray-600 text-center mt-4">
             {lang === 'ru' ? 'Безопасная оплата через Stripe' : 'Secure payment powered by Stripe'}
           </p>
 
@@ -433,7 +457,10 @@ export function Results() {
   const resultsTitle = lang === 'ru' ? 'Результаты IQ теста' : 'Your IQ Test Results';
   const overallScoreLabel = lang === 'ru' ? 'ОБЩИЙ БАЛЛ' : 'OVERALL SCORE';
   const profileHeading = lang === 'ru' ? 'Ваш когнитивный профиль' : 'Your Cognitive Profile';
-  const emailSentText = lang === 'ru' ? 'Копия результатов отправлена на' : 'A copy of these results has been sent to';
+  const messageLocale = lang === 'ru' ? 'ru' : 'en';
+  const emailMessageKey = session.email_status === 'sent' ? 'emailSent' : session.email_status === 'failed' ? 'emailFailed'
+    : session.email_status === 'pending' || session.email_status === 'sending' ? 'emailQueued' : 'emailUnknown';
+  const emailSentText = presentation.messages[emailMessageKey][messageLocale];
   const takeAnotherText = lang === 'ru' ? 'Пройти другой тест' : 'Take Another Test';
 
   // Dimension labels
@@ -447,8 +474,18 @@ export function Results() {
   const intuitiveDesc = lang === 'ru' ? 'Креативность, ассоциативное мышление' : 'Creativity, associative thinking';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-8 px-4">
+    <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
+        {session.is_paid && accessToken && <section className="mb-6 rounded-xl border border-indigo-200 bg-white p-4 print:hidden">
+          <p className="mb-3 text-sm text-gray-700">{lang === 'ru' ? 'Сохраните персональную ссылку, чтобы вернуться к результату. Ссылка даёт доступ к вашему результату — храните её для себя.' : 'Save your personal link to return to this result. Anyone with this link can open your result; keep it private.'}</p>
+          <button className="rounded-lg bg-indigo-600 px-4 py-2 text-white" onClick={async () => {
+            const link = new URL(resultPath(session.id, accessToken), window.location.origin).href;
+            try { await navigator.clipboard.writeText(link); setLinkCopied(true); }
+            catch { setShowPersonalLink(true); }
+          }}>{linkCopied ? (lang === 'ru' ? 'Ссылка скопирована' : 'Link copied') : (lang === 'ru' ? 'Сохранить персональную ссылку' : 'Save personal link')}</button>
+          {showPersonalLink && <label className="mt-3 block text-sm">{lang === 'ru' ? 'Скопируйте ссылку:' : 'Copy this link:'}<input readOnly onFocus={event => event.currentTarget.select()} value={new URL(resultPath(session.id, accessToken), window.location.origin).href} className="mt-1 w-full rounded border p-2" /></label>}
+          <p className="mt-3 text-sm"><SupportLink /></p>
+        </section>}
         {/* Language Switcher */}
         <div className="flex justify-end mb-4">
           <LanguageSwitcher />
@@ -467,7 +504,7 @@ export function Results() {
           ) : (
             <h1 className="text-3xl font-bold text-gray-900">{getContent(`results_title${langKey}`, resultsTitle)}</h1>
           )}
-          <p className="text-gray-500 mt-2">{test?.title}</p>
+        <p className="text-gray-600 mt-2">{test?.title}</p>
         </div>
 
         {/* Overall Score */}
@@ -501,7 +538,7 @@ export function Results() {
                 className="font-semibold text-gray-900"
               />
             ) : getContent(`results_analyst_title${langKey}`, analystTitle)}
-            score={session.analyst_score || 0}
+            score={session.analyst_score}
             color="blue"
             description={isAdmin && isPreview ? (
               <EditableField
@@ -521,7 +558,7 @@ export function Results() {
                 className="font-semibold text-gray-900"
               />
             ) : getContent(`results_strategist_title${langKey}`, strategistTitle)}
-            score={session.strategist_score || 0}
+            score={session.strategist_score}
             color="purple"
             description={isAdmin && isPreview ? (
               <EditableField
@@ -541,7 +578,7 @@ export function Results() {
                 className="font-semibold text-gray-900"
               />
             ) : getContent(`results_observer_title${langKey}`, observerTitle)}
-            score={session.observer_score || 0}
+            score={session.observer_score}
             color="green"
             description={isAdmin && isPreview ? (
               <EditableField
@@ -561,7 +598,7 @@ export function Results() {
                 className="font-semibold text-gray-900"
               />
             ) : getContent(`results_intuitive_title${langKey}`, intuitiveTitle)}
-            score={session.intuitive_score || 0}
+            score={session.intuitive_score}
             color="yellow"
             description={isAdmin && isPreview ? (
               <EditableField
@@ -580,19 +617,22 @@ export function Results() {
             <EditableField
               value={getContent(`results_profile_heading${langKey}`, profileHeading)}
               onSave={(value) => saveContent(`results_profile_heading${langKey}`, value)}
-              as="h3"
+              as="h2"
               className="text-lg font-semibold text-gray-900 mb-4"
             />
           ) : (
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{getContent(`results_profile_heading${langKey}`, profileHeading)}</h3>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">{getContent(`results_profile_heading${langKey}`, profileHeading)}</h2>
           )}
-          <p className="text-gray-600 leading-relaxed">
-            {getProfileDescription(session, lang)}
-          </p>
+          {presentationError ? <div role="alert" className="text-red-800">
+            <p>{lang === 'ru' ? 'Не удалось загрузить правила отображения результата.' : 'Could not load the result presentation rules.'}</p>
+            <button className="mt-2 rounded border px-3 py-2" onClick={() => void reloadPresentation()}>{lang === 'ru' ? 'Повторить' : 'Retry'}</button>
+          </div> : <p className="text-gray-600 leading-relaxed">
+            {presentationLoading ? t('common.loading') : getProfileDescription(session, lang, presentation)}
+          </p>}
         </div>
 
         {/* Archetype Result Block */}
-        {archetypeResult && (
+        {archetypeResult && archetypeResult.dimension === chosenDimension && (
           <ArchetypeResultSection
             archetype={archetypeResult}
             lang={lang}
@@ -602,18 +642,19 @@ export function Results() {
 
         {/* Email confirmation */}
         {session.email && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center gap-3">
-            <Mail className="w-5 h-5 text-green-600" />
-            <div className="text-sm text-green-700">
+          <div role={session.email_status === 'failed' ? 'alert' : 'status'} className={`border rounded-xl p-4 mb-6 flex items-center gap-3 ${session.email_status === 'failed' ? 'bg-red-50 border-red-200 text-red-800' : session.email_status === 'sent' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-slate-50 border-slate-200 text-slate-800'}`}>
+            <Mail className="w-5 h-5 shrink-0" />
+            <div className="text-sm">
               {isAdmin && isPreview ? (
                 <EditableField
-                  value={getContent(`results_email_sent${langKey}`, emailSentText)}
-                  onSave={(value) => saveContent(`results_email_sent${langKey}`, value)}
+                  key={`${emailMessageKey}_${messageLocale}`}
+                  value={emailSentText}
+                  onSave={value => savePresentation({...presentation,messages:{...presentation.messages,[emailMessageKey]:{...presentation.messages[emailMessageKey],[messageLocale]:value}}})}
                   as="span"
                   className="text-sm text-green-700"
                 />
               ) : (
-                getContent(`results_email_sent${langKey}`, emailSentText)
+                emailSentText
               )}{' '}
               <strong>{session.email}</strong>
             </div>
@@ -650,7 +691,7 @@ function DimensionCard({
   description
 }: {
   title: React.ReactNode;
-  score: number;
+  score: number | null;
   color: 'blue' | 'purple' | 'green' | 'yellow';
   description: React.ReactNode;
 }) {
@@ -665,15 +706,15 @@ function DimensionCard({
     blue: 'text-blue-600',
     purple: 'text-purple-600',
     green: 'text-green-600',
-    yellow: 'text-yellow-600',
+    yellow: 'text-yellow-800',
   };
 
   return (
     <div className={`rounded-xl border-2 p-6 ${colorClasses[color]}`}>
       <div className="flex justify-between items-start mb-2">
-        <h4 className="font-semibold text-gray-900">{title}</h4>
+        <h2 className="font-semibold text-gray-900">{title}</h2>
         <span className={`text-2xl font-bold ${textClasses[color]}`}>
-          {Math.round(score)}%
+          {score === null ? '—' : `${Math.round(score)}%`}
         </span>
       </div>
       <div className="text-sm text-gray-600">{description}</div>
@@ -682,59 +723,13 @@ function DimensionCard({
           className={`h-full rounded-full transition-all duration-500 ${color === 'blue' ? 'bg-blue-500' :
             color === 'purple' ? 'bg-purple-500' :
               color === 'green' ? 'bg-green-500' :
-                'bg-yellow-500'
+                  'bg-yellow-700'
             }`}
-          style={{ width: `${score}%` }}
+          style={{ width: `${score ?? 0}%` }}
         />
       </div>
     </div>
   );
-}
-
-function getScoreInterpretation(score: number, lang: string): string {
-  if (lang === 'ru') {
-    if (score >= 80) return 'Отлично! Ваши когнитивные способности высокоразвиты.';
-    if (score >= 60) return 'Хороший результат! Ваши способности выше среднего.';
-    if (score >= 40) return 'Средний результат. Есть потенциал для развития.';
-    return 'Есть возможности для улучшения в этой области.';
-  }
-  if (score >= 80) return 'Excellent! Your cognitive abilities are highly developed.';
-  if (score >= 60) return 'Good result! Your abilities are above average.';
-  if (score >= 40) return 'Average result. There is potential for development.';
-  return 'There are opportunities for improvement in this area.';
-}
-
-function getProfileDescription(session: TestSession, lang: string): string {
-  const scores = [
-    { name: lang === 'ru' ? 'Аналитик' : 'Analyst', key: 'analyst', score: session.analyst_score || 0 },
-    { name: lang === 'ru' ? 'Стратег' : 'Strategist', key: 'strategist', score: session.strategist_score || 0 },
-    { name: lang === 'ru' ? 'Наблюдатель' : 'Observer', key: 'observer', score: session.observer_score || 0 },
-    { name: lang === 'ru' ? 'Интуит' : 'Intuitive', key: 'intuitive', score: session.intuitive_score || 0 },
-  ];
-
-  const strongest = scores.reduce((max, s) => s.score > max.score ? s : max);
-
-  const descriptions: Record<string, { ru: string; en: string }> = {
-    'analyst': {
-      ru: 'Вы превосходно справляетесь с логическими задачами и анализом данных. Карьера в аналитике, программировании, науке и финансах вам подходит.',
-      en: 'You excel at logical tasks and data analysis. Your approach to problem-solving is based on facts and rational thinking. Careers in analytics, programming, science, and finance suit you well.',
-    },
-    'strategist': {
-      ru: 'Вы умеете планировать наперёд и видеть общую картину. Лидерство, управление проектами и бизнес-планирование — ваши сильные стороны.',
-      en: 'You are skilled at planning ahead and seeing the big picture. Leadership positions, project management, and business planning are your strengths.',
-    },
-    'observer': {
-      ru: 'У вас отличное пространственное мышление и внимание к деталям. Карьера в дизайне, архитектуре, инженерии и искусстве вам подходит.',
-      en: 'You have excellent spatial thinking and attention to detail. Careers in design, architecture, engineering, and art suit you.',
-    },
-    'intuitive': {
-      ru: 'Ваше творческое мышление позволяет находить нестандартные решения. Творческие профессии, инновации и предпринимательство — ваше призвание.',
-      en: 'Your creative and associative thinking allows you to find unconventional solutions. Creative professions, innovation, and entrepreneurship are your calling.',
-    },
-  };
-
-  const prefix = lang === 'ru' ? `Ваша сильнейшая сторона — ${strongest.name}. ` : `Your strongest dimension is ${strongest.name}. `;
-  return prefix + descriptions[strongest.key][lang as 'ru' | 'en'];
 }
 
 // Archetype Result Section Component

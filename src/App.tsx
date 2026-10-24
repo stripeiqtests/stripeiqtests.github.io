@@ -1,18 +1,21 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { Home } from './pages/Home';
-import { Test } from './pages/Test';
-import { PaymentSuccess } from './pages/PaymentSuccess';
-import { PaymentCancel } from './pages/PaymentCancel';
-import { Privacy } from './pages/Privacy';
-import { Terms } from './pages/Terms';
 import { LanguageProvider } from './lib/i18n';
 import { AdminProvider } from './lib/AdminContext';
 import { CookieConsent } from './components/CookieConsent';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { SiteSettingsProvider } from './lib/siteSettings';
+import {RouteMetadata} from './components/RouteMetadata';
 
 // Lazy load heavy components
 const Admin = lazy(() => import('./pages/Admin').then(m => ({ default: m.Admin })));
 const Results = lazy(() => import('./pages/Results').then(m => ({ default: m.Results })));
+const Test = lazy(() => import('./pages/Test').then(m => ({ default: m.Test })));
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess').then(m => ({ default: m.PaymentSuccess })));
+const PaymentCancel = lazy(() => import('./pages/PaymentCancel').then(m => ({ default: m.PaymentCancel })));
+const Privacy = lazy(() => import('./pages/Privacy').then(m => ({ default: m.Privacy })));
+const Terms = lazy(() => import('./pages/Terms').then(m => ({ default: m.Terms })));
 
 // Loading fallback component
 function LoadingSpinner() {
@@ -30,8 +33,11 @@ function App() {
   return (
     <AdminProvider>
       <LanguageProvider>
+        <SiteSettingsProvider>
         <BrowserRouter>
-          <Suspense fallback={<LoadingSpinner />}>
+          <RouteMetadata />
+          <CookieConsent />
+          <ErrorBoundary><Suspense fallback={<LoadingSpinner />}>
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/admin/*" element={<Admin />} />
@@ -42,9 +48,9 @@ function App() {
               <Route path="/payment/success" element={<PaymentSuccess />} />
               <Route path="/payment/cancel" element={<PaymentCancel />} />
             </Routes>
-          </Suspense>
-          <CookieConsent />
+          </Suspense></ErrorBoundary>
         </BrowserRouter>
+        </SiteSettingsProvider>
       </LanguageProvider>
     </AdminProvider>
   );

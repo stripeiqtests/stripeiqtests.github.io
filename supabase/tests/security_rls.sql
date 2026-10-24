@@ -34,14 +34,16 @@ from public.submit_test_session(:'test_id'::uuid, null, :'answers'::jsonb)
 
 select (
   count(*) = 1
-  and min(overall_score) = 100
-) as owner_can_read_authoritative_score
+  and count(overall_score) = 0
+  and count(analyst_score) = 0
+  and count(answers) = 0
+) as unpaid_owner_cannot_read_scores
 from public.get_test_session(:'session_id'::uuid, :'access_token'::uuid)
 \gset
 
-\if :owner_can_read_authoritative_score
+\if :unpaid_owner_cannot_read_scores
 \else
-  \echo 'server-side scoring or capability-authorized read failed'
+  \echo 'unpaid result leaked authoritative scores or answers'
   select 1 / 0;
 \endif
 
@@ -59,6 +61,28 @@ from public.get_test_session(
 \endif
 
 reset role;
+
+-- The calculation remains authoritative; payment controls its disclosure.
+select overall_score = 100 as authoritative_scoring_correct
+from public.test_sessions where id = :'session_id'::uuid
+\gset
+\if :authoritative_scoring_correct
+\else
+  select 1 / 0;
+\endif
+
+update public.test_sessions set is_paid = true where id = :'session_id'::uuid;
+set local role anon;
+select count(*) = 1 and min(overall_score) = 100 as paid_owner_can_read_scores
+from public.get_test_session(:'session_id'::uuid, :'access_token'::uuid)
+\gset
+\if :paid_owner_can_read_scores
+\else
+  \echo 'paid owner cannot read the authoritative score'
+  select 1 / 0;
+\endif
+reset role;
+
 set local role authenticated;
 select set_config('request.jwt.claims', '{"app_metadata":{}}', true);
 

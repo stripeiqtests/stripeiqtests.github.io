@@ -1,0 +1,33 @@
+{
+  "project": "afsoyuczexiztsjntkvi",
+  "authorization": "Explicit user approval for both named patches in this chat before execution",
+  "patches": [
+    {
+      "migration": "20261022205025_pinned_test_attempts.sql",
+      "source_sha256_at_execution": "f018431b53eccb76a91420df74d29138b78f6f1b817b235f74d6ff588819db1c",
+      "execution": "Supabase SQL Editor: Success. No rows returned"
+    },
+    {
+      "migration": "20261022204510_normalize_image_bucket_limits.sql",
+      "source_sha256_at_execution": "f20bed0c64387ba26c6c6dff24349d2c50fb3ca4bafcbf5fb2037472f7e3ccb8",
+      "execution": "Supabase SQL Editor: Success. No rows returned"
+    }
+  ],
+  "read_only_checks": {
+    "private_tables_have_rls": true,
+    "public_cannot_read_private_tables": true,
+    "new_apis_callable": true,
+    "checkout_rpc_still_private": true,
+    "wrong_result_capability_denied": true,
+    "admission_defaults_correct": true,
+    "image_limits_correct": true,
+    "legacy_api_preserved_for_current_frontend": true,
+    "test_count": 2,
+    "question_count": 21,
+    "attempt_count": 0,
+    "version_count": 0
+  },
+  "frontend_released": false,
+  "legacy_submission_retired": false,
+  "edge_functions_deployed": false
+}

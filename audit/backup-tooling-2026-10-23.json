@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-23",
+  "target_project": "afsoyuczexiztsjntkvi",
+  "production_changed": false,
+  "live_data_exported": false,
+  "credentials_collected": false,
+  "scheduled_on_vps": false,
+  "tests": {
+    "command": "pnpm test:database",
+    "backup_scenarios_passed": 11,
+    "postgresql_major": 17,
+    "encryption": "Official age v1.3.2, generated throwaway native X25519 fixture identity",
+    "restore": "Real pg_dump custom archive encrypted, authenticated, hash-checked and restored with pg_restore into a new isolated database",
+    "verified": [
+      "Active and archived tests, questions and settings",
+      "Paid/unpaid session data, private checkout orders and mail outbox",
+      "Pinned question versions and attempt/result binding",
+      "Storage bucket/object metadata",
+      "RLS policies, private read restrictions and retired legacy submission grant",
+      "Anonymous pinned submission and hidden unpaid scores after restore",
+      "Exact archived fixture image bytes, nested Unicode object names and pagination",
+      "Wrong key, ciphertext corruption and truncated final authentication rejected",
+      "Authenticated but inconsistent file hashes, unsafe paths, links and duplicate members rejected",
+      "Unavailable/changing Storage, incomplete downloads and low disk leave no complete archive",
+      "Existing output is preserved; HTTP redirects are not followed; secrets/body are not logged"
+    ]
+  },
+  "release_asset_sha256": {
+    "age-v1.3.2-windows-amd64.zip": "f48d8f8f9ebe903ab5027ed067652f2cc1db94bc206976430133b905dcd8e8c7",
+    "age-v1.3.2-linux-amd64.tar.gz": "cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10"
+  },
+  "limitations": [
+    "Storage HTTP uses deterministic fixtures; no hosted Supabase Auth/Storage restore performed",
+    "Restore database uses existing isolated platform roles; role SQL is archived without passwords, not replayed over reserved roles",
+    "Full PostgreSQL archive is not a one-command migration into an existing managed Supabase schema",
+    "Database snapshot and Storage inventory checks do not establish cross-service atomicity",
+    "Live credentials, encryption-key custody, disk/egress budget, off-site storage, retention and alerts require operator configuration",
+    "Free-plan pausing is not guaranteed to be prevented"
+  ]
+}

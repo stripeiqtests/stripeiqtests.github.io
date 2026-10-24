@@ -1,0 +1,58 @@
+{
+  "date": "2026-10-23",
+  "scope": "Restore authored copy without undoing technical reliability/security fixes",
+  "status": "draft PR only; no main/frontend/Edge deployment or stored production content update",
+  "restored": [
+    "original homepage title and description",
+    "16 original score interpretation and single-leader profile strings verified against origin/main",
+    "original homepage authored defaults verified against origin/main",
+    "original Russian email heading/sender/subject/interpretation/descriptions/thank-you",
+    "stored archetype title/content retained verbatim, HTML escaped"
+  ],
+  "proposals": "COPY_REVIEW.md; payment pending, delivery state and zero/tie wording await review",
+  "validation": {
+    "browser_passed": 49,
+    "edge_passed": 10,
+    "lint": "passed",
+    "build": "passed; existing approximately 540kB main chunk warning remains",
+    "edge_typecheck": "passed for all four entry points",
+    "security": "passed",
+    "rich_text": "passed",
+    "hosting": "2 passed"
+  },
+  "email_retry": "Fixture first-provider failure then retry retained identical frozen authored content and no duplicate archetype read; no real mail sent",
+  "bundles": {
+    "project": "afsoyuczexiztsjntkvi",
+    "deployed": false,
+    "functions": [
+      {
+        "name": "create-checkout",
+        "file": "create-checkout.js",
+        "verify_jwt": false,
+        "sha256": "046c8e7346ef8530e4ac7a2e0a67d54dd3f26da8e41d35495d979538ce7ab047",
+        "bytes": 6240
+      },
+      {
+        "name": "verify-payment",
+        "file": "verify-payment.js",
+        "verify_jwt": false,
+        "sha256": "babdececd47d5eed1575c5cb73e5ed3c8064ffeaf4985a9dfe76755185c0cf91",
+        "bytes": 14396
+      },
+      {
+        "name": "send-results-email",
+        "file": "send-results-email.js",
+        "verify_jwt": false,
+        "sha256": "a4dc6744171e58ce7dad4c247b305f315dbcefa4d35e18d27fcfefb640d8f305",
+        "bytes": 11855
+      },
+      {
+        "name": "stripe-webhook",
+        "file": "stripe-webhook.js",
+        "verify_jwt": false,
+        "sha256": "4aa15a6a702ca1bd56fd451285219bc38b63b877a2bea9d95dfdafafa13e43e9",
+        "bytes": 5595
+      }
+    ]
+  }
+}

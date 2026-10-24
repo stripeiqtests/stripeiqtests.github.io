@@ -1,0 +1,55 @@
+name: Validate application
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0, Node 24
+        with:
+          version: 10.26.2
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0, Node 24
+        with:
+          node-version: '22'
+          cache: pnpm
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5, Node 24
+        with:
+          deno-version: v2.9.6
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test:security
+      - run: pnpm test:rich-text
+      - run: pnpm test:hosting
+      - run: pnpm test:scheduler
+      - run: pnpm test:scheduler-runtime
+      - run: pnpm test:edge
+      - run: pnpm check:edge
+      - run: pnpm bundle:edge
+      - run: pnpm test:database
+      - run: python3 -m unittest discover -s ops/health -p 'test_*.py' -v
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:browser
+      - run: pnpm build
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2, Node 24
+        with:
+          name: browser-failure-evidence
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore

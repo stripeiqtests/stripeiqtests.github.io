@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { AdminPresentationSettings } from './AdminPresentationSettings';
 import { supabase } from '../lib/supabase';
 import type { Test } from '../lib/supabase';
 import { Save, Check, Globe } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
+import { useSiteSettings, supportHref } from '../lib/siteSettings';
 
 interface AdminSettingsTabProps {
     tests: Test[];
@@ -12,53 +14,53 @@ type LanguageMode = 'ru' | 'en' | 'bilingual';
 
 export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
     const { lang, languageMode, setLanguageMode } = useLanguage();
+    const { supportContact, saveSupportContact } = useSiteSettings();
+    const [contactDraft, setContactDraft] = useState<string | null>(null);
+    const [savingContact, setSavingContact] = useState(false);
+    const [contactSaved, setContactSaved] = useState(false);
+    const [saveError, setSaveError] = useState('');
     const [followUpTestSlug, setFollowUpTestSlug] = useState<string>('');
     const [loading, setLoading] = useState(true);
+    const [followUpLoadError, setFollowUpLoadError] = useState(false);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [savingLanguageMode, setSavingLanguageMode] = useState(false);
     const [languageModeSaved, setLanguageModeSaved] = useState(false);
 
     useEffect(() => {
-        // The request resolves before it updates local UI state.
-        // eslint-disable-next-line react-hooks/immutability
-        loadSettings();
-    }, []);
-
-    async function loadSettings() {
-        setLoading(true);
-        const { data } = await supabase
+        let cancelled=false;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(),8000);
+        void Promise.resolve(supabase
             .from('app_settings')
             .select('value')
             .eq('key', 'follow_up_test_slug')
-            .single();
-
-        if (data) {
-            setFollowUpTestSlug(data.value || '');
-        }
-        setLoading(false);
-    }
+            .retry(false)
+            .abortSignal(controller.signal)
+            .maybeSingle()).then(({data,error})=>{
+                if(cancelled)return;
+                if(error)setFollowUpLoadError(true);
+                if(data)setFollowUpTestSlug(data.value||'');
+            }).catch(()=>{if(!cancelled)setFollowUpLoadError(true);})
+            .finally(()=>{clearTimeout(timeout);if(!cancelled)setLoading(false);});
+        return ()=>{cancelled=true;clearTimeout(timeout);controller.abort();};
+    }, []);
 
     async function saveFollowUpTestSlug() {
+        if (saving || loading || followUpLoadError) return;
         setSaving(true);
         setSaved(false);
 
-        // Try to update first
-        const { error: updateError } = await supabase
-            .from('app_settings')
-            .update({ value: followUpTestSlug, updated_at: new Date().toISOString() })
-            .eq('key', 'follow_up_test_slug');
-
-        if (updateError) {
-            // If update fails, try insert
-            await supabase
-                .from('app_settings')
-                .insert({ key: 'follow_up_test_slug', value: followUpTestSlug });
-        }
-
-        setSaving(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        setSaveError('');
+        try {
+            const { error } = await supabase.from('app_settings')
+                .upsert({ key: 'follow_up_test_slug', value: followUpTestSlug, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+                .abortSignal(AbortSignal.timeout(8000));
+            if (error) throw error;
+            setSaved(true);
+            setTimeout(() => setSaved(false), 2000);
+        } catch { setSaveError(lang === 'ru' ? 'Не удалось сохранить настройку. Попробуйте ещё раз.' : 'Could not save this setting. Please retry.'); }
+        finally { setSaving(false); }
     }
 
     async function handleLanguageModeChange(mode: LanguageMode) {
@@ -70,6 +72,7 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
             setTimeout(() => setLanguageModeSaved(false), 2000);
         } catch (error) {
             console.error('Error saving language mode:', error);
+            setSaveError(lang === 'ru' ? 'Не удалось сохранить язык. Попробуйте ещё раз.' : 'Could not save the language. Please retry.');
         }
         setSavingLanguageMode(false);
     }
@@ -84,9 +87,25 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
 
     return (
         <div className="space-y-6">
+            {(saveError || followUpLoadError) && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{saveError || (lang==='ru'?'Не удалось загрузить настройки. Обновите страницу.':'Could not load settings. Please reload.')}</p>}
+            <form className="rounded-xl border bg-white p-6" onSubmit={async event => {
+                event.preventDefault(); if (savingContact) return;
+                setSavingContact(true); setContactSaved(false); setSaveError('');
+                try { await saveSupportContact(contactDraft ?? supportContact); setContactDraft(null); setContactSaved(true); }
+                catch { setSaveError(lang === 'ru' ? 'Не удалось сохранить контакт поддержки.' : 'Could not save the support contact.'); }
+                finally { setSavingContact(false); }
+            }}>
+                <label htmlFor="support-contact" className="mb-2 block font-semibold">{lang === 'ru' ? 'Публичный контакт поддержки' : 'Public support contact'}</label>
+                <p className="mb-3 text-sm text-gray-700">{lang === 'ru' ? 'Email или HTTPS-ссылка. Контакт показывается на сайте и при проблемах с оплатой.' : 'Email or HTTPS link, shown on the website and payment error screens.'}</p>
+                <input id="support-contact" type="text" value={contactDraft ?? supportContact} onChange={e => { setContactDraft(e.target.value); setContactSaved(false); }} disabled={savingContact} className="w-full rounded-lg border px-3 py-2" required />
+                <button type="submit" disabled={savingContact || !supportHref(contactDraft ?? supportContact)} className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-white disabled:opacity-50">{savingContact ? (lang === 'ru' ? 'Сохранение…' : 'Saving…') : (lang === 'ru' ? 'Сохранить контакт' : 'Save contact')}</button>
+                {contactSaved && <span role="status" className="ml-3 text-green-800">{lang === 'ru' ? 'Сохранено' : 'Saved'}</span>}
+            </form>
             <h2 className="text-xl font-bold text-gray-900">
                 {lang === 'ru' ? 'Настройки' : 'Settings'}
             </h2>
+
+            <AdminPresentationSettings />
 
             {/* Language Mode Setting */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -129,7 +148,7 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
                             </p>
                         </div>
                         {languageMode === 'ru' && (
-                            <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                            <span className="text-xs text-green-800 bg-green-100 px-2 py-1 rounded">
                                 {lang === 'ru' ? 'По умолчанию' : 'Default'}
                             </span>
                         )}
@@ -190,8 +209,10 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
                             {lang === 'ru' ? 'Целевой тест' : 'Target Test'}
                         </label>
                         <select
+                            aria-label={lang==='ru'?'Целевой тест':'Target Test'}
                             value={followUpTestSlug}
-                            onChange={(e) => setFollowUpTestSlug(e.target.value)}
+                            onChange={(e) => { setFollowUpTestSlug(e.target.value);setSaved(false); }}
+                            disabled={saving || followUpLoadError}
                             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         >
                             <option value="">{lang === 'ru' ? '— Кнопка скрыта —' : '— Button hidden —'}</option>
@@ -205,7 +226,7 @@ export function AdminSettingsTab({ tests }: AdminSettingsTabProps) {
 
                     <button
                         onClick={saveFollowUpTestSlug}
-                        disabled={saving}
+                            disabled={saving || followUpLoadError}
                         className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
                     >
                         {saved ? (

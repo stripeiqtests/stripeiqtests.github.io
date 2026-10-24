@@ -7,33 +7,37 @@ import { useLanguage, LanguageSwitcher } from '../lib/i18n';
 import { useAdmin } from '../lib/AdminContext';
 import { EditableField } from '../components/EditableField';
 import { useContent } from '../lib/useContent';
+import { SupportLink } from '../components/SupportLink';
+import { openConsentSettings } from '../lib/consent';
 
 export function Home() {
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError,setLoadError]=useState(false);
   const { t, lang } = useLanguage();
   const { isAdmin } = useAdmin();
   const { getContent, saveContent } = useContent();
 
   useEffect(() => {
-    // The request resolves before it updates local UI state.
-    // eslint-disable-next-line react-hooks/immutability
+    // Initial loading and explicit retries share this asynchronous loader.
     loadTests();
   }, []);
 
   async function loadTests() {
+    setLoading(true);setLoadError(false);
+    try {
     const { data, error } = await supabase
       .from('tests')
       .select('*')
       .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .retry(false)
+      .abortSignal(AbortSignal.timeout(8000));
 
-    if (error) {
-      console.error('Error loading tests:', error);
-    } else {
-      setTests(data || []);
-    }
-    setLoading(false);
+    if(error)throw error;
+    setTests(data||[]);
+    }catch{setLoadError(true);}
+    finally{setLoading(false);}
   }
 
   const heroTitle = lang === 'ru'
@@ -107,7 +111,7 @@ export function Home() {
             )}
             <Link
               to="/admin"
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-1"
+              className="text-sm text-gray-600 hover:text-gray-800 transition-colors flex items-center gap-1"
             >
               <Settings className="w-4 h-4" />
               Admin
@@ -116,8 +120,9 @@ export function Home() {
         </div>
       </header>
 
+      <main>
       {/* Hero Section */}
-      <section className="max-w-6xl mx-auto px-4 py-16 text-center">
+      <section className="max-w-6xl mx-auto px-4 py-8 md:py-16 text-center">
         <EditableField
           value={heroTitle}
           onSave={(value) => saveContent(lang === 'ru' ? 'hero_title_ru' : 'hero_title_en', value)}
@@ -134,6 +139,12 @@ export function Home() {
           />
         </div>
 
+        {!loading && tests.length > 0 && <div className="mb-10">
+          {tests.length === 1 ? <Link data-testid="hero-start" to={`/${tests[0].slug}`} className="inline-flex rounded-xl bg-indigo-600 px-8 py-3 font-semibold text-white hover:bg-indigo-700">{t('home.start_test')}</Link>
+            : <a href="#available-tests" className="inline-flex rounded-xl bg-indigo-600 px-8 py-3 font-semibold text-white hover:bg-indigo-700">{lang === 'ru' ? 'Выбрать тест' : 'Choose a test'}</a>}
+          <p className="mt-3 text-sm text-gray-700">{lang === 'ru' ? 'Пройти тест бесплатно. ' : 'Take the test for free. '}{tests.length === 1 ? (lang === 'ru' ? `Полный результат — $${(tests[0].price_cents / 100).toFixed(2)}.` : `Full results — $${(tests[0].price_cents / 100).toFixed(2)}.`) : (lang === 'ru' ? 'Цена полного результата указана у каждого теста.' : 'Full result prices are shown with each test.')}</p>
+        </div>}
+
         {/* Features */}
         <div className="grid md:grid-cols-4 gap-6 mb-16">
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 text-center">
@@ -141,7 +152,7 @@ export function Home() {
             <EditableField
               value={feature1Title}
               onSave={(value) => saveContent(lang === 'ru' ? 'feature1_title_ru' : 'feature1_title_en', value)}
-              as="h3"
+              as="h2"
               className="font-semibold text-gray-900 mb-2"
             />
             <EditableField
@@ -156,7 +167,7 @@ export function Home() {
             <EditableField
               value={feature2Title}
               onSave={(value) => saveContent(lang === 'ru' ? 'feature2_title_ru' : 'feature2_title_en', value)}
-              as="h3"
+              as="h2"
               className="font-semibold text-gray-900 mb-2"
             />
             <EditableField
@@ -171,7 +182,7 @@ export function Home() {
             <EditableField
               value={feature3Title}
               onSave={(value) => saveContent(lang === 'ru' ? 'feature3_title_ru' : 'feature3_title_en', value)}
-              as="h3"
+              as="h2"
               className="font-semibold text-gray-900 mb-2"
             />
             <EditableField
@@ -186,7 +197,7 @@ export function Home() {
             <EditableField
               value={feature4Title}
               onSave={(value) => saveContent(lang === 'ru' ? 'feature4_title_ru' : 'feature4_title_en', value)}
-              as="h3"
+              as="h2"
               className="font-semibold text-gray-900 mb-2"
             />
             <EditableField
@@ -208,7 +219,7 @@ export function Home() {
               <EditableField
                 value={methodologyTitle}
                 onSave={(value) => saveContent(lang === 'ru' ? 'methodology_title_ru' : 'methodology_title_en', value)}
-                as="span"
+                as="h2"
                 className="font-semibold text-gray-900"
               />
             </div>
@@ -230,7 +241,7 @@ export function Home() {
                 <EditableField
                   value={methodSub1Title}
                   onSave={(value) => saveContent(lang === 'ru' ? 'method_sub1_title_ru' : 'method_sub1_title_en', value)}
-                  as="h4"
+                  as="h3"
                   className="font-semibold text-gray-900 flex items-center gap-2"
                 />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
@@ -251,7 +262,7 @@ export function Home() {
                 <EditableField
                   value={methodSub2Title}
                   onSave={(value) => saveContent(lang === 'ru' ? 'method_sub2_title_ru' : 'method_sub2_title_en', value)}
-                  as="h4"
+                  as="h3"
                   className="font-semibold text-gray-900 flex items-center gap-2"
                 />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
@@ -272,7 +283,7 @@ export function Home() {
                 <EditableField
                   value={methodSub3Title}
                   onSave={(value) => saveContent(lang === 'ru' ? 'method_sub3_title_ru' : 'method_sub3_title_en', value)}
-                  as="h4"
+                  as="h3"
                   className="font-semibold text-gray-900 flex items-center gap-2"
                 />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
@@ -293,7 +304,7 @@ export function Home() {
                 <EditableField
                   value={methodSub4Title}
                   onSave={(value) => saveContent(lang === 'ru' ? 'method_sub4_title_ru' : 'method_sub4_title_en', value)}
-                  as="h4"
+                  as="h3"
                   className="font-semibold text-gray-900 flex items-center gap-2"
                 />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
@@ -314,7 +325,7 @@ export function Home() {
                 <EditableField
                   value={methodSub5Title}
                   onSave={(value) => saveContent(lang === 'ru' ? 'method_sub5_title_ru' : 'method_sub5_title_en', value)}
-                  as="h4"
+                  as="h3"
                   className="font-semibold text-gray-900 flex items-center gap-2"
                 />
                 <ChevronDown className="w-4 h-4 text-gray-400 group-open/sub:rotate-180 transition-transform" />
@@ -333,7 +344,7 @@ export function Home() {
       </section>
 
       {/* Available Tests */}
-      <section className="max-w-4xl mx-auto px-4 pb-16">
+      <section id="available-tests" className="max-w-4xl mx-auto px-4 pb-16 scroll-mt-24">
         <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">
           {t('home.available_tests')}
         </h2>
@@ -342,6 +353,13 @@ export function Home() {
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
             <p className="mt-4 text-gray-500">{t('common.loading')}</p>
+          </div>
+        ) : loadError ? (
+          <div role="alert" className="rounded-xl border border-amber-200 bg-white p-6 text-center">
+            <h3 className="font-semibold text-gray-900">{lang==='ru'?'Не удалось загрузить список тестов':'Could not load available tests'}</h3>
+            <p className="mt-2 text-gray-700">{lang==='ru'?'Проверьте подключение и повторите загрузку.':'Check your connection and try again.'}</p>
+            <button className="my-4 rounded-lg border border-indigo-600 px-4 py-2 text-indigo-700" onClick={()=>void loadTests()}>{lang==='ru'?'Повторить':'Retry'}</button>
+            <p><SupportLink /></p>
           </div>
         ) : tests.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
@@ -366,8 +384,8 @@ export function Home() {
                     <Edit2 className="w-4 h-4" />
                   </Link>
                 )}
-                <div className="flex justify-between items-start">
-                  <div>
+                <div className="flex flex-col gap-5 sm:flex-row sm:justify-between sm:items-start">
+                  <div className="min-w-0 flex-1">
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">{test.title}</h3>
                     <p className="text-gray-600 mb-4">{test.description}</p>
                     <p className="text-sm text-gray-500">
@@ -378,7 +396,7 @@ export function Home() {
                   </div>
                   <Link
                     to={`/${test.slug}`}
-                    className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                    className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors whitespace-nowrap text-center sm:shrink-0"
                   >
                     {t('home.start_test')}
                   </Link>
@@ -390,6 +408,7 @@ export function Home() {
       </section>
 
       {/* Footer */}
+      </main>
       <footer className="bg-white border-t border-gray-100 py-8">
         <div className="max-w-6xl mx-auto px-4 text-center">
           <EditableField
@@ -400,14 +419,15 @@ export function Home() {
             multiline
           />
           <div className="mt-4 flex justify-center gap-4 text-sm">
-            <a href="/privacy" className="text-gray-400 hover:text-indigo-600 transition-colors">
+            <a href="/privacy" className="text-gray-600 underline hover:text-indigo-700 transition-colors">
               {lang === 'ru' ? 'Политика конфиденциальности' : 'Privacy Policy'}
             </a>
             <span className="text-gray-300">|</span>
-            <a href="/terms" className="text-gray-400 hover:text-indigo-600 transition-colors">
+            <a href="/terms" className="text-gray-600 underline hover:text-indigo-700 transition-colors">
               {lang === 'ru' ? 'Условия использования' : 'Terms of Use'}
             </a>
           </div>
+          <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm"><SupportLink /><button className="text-indigo-700 underline" onClick={openConsentSettings}>{lang === 'ru' ? 'Настройки cookies' : 'Cookie settings'}</button></div>
         </div>
       </footer>
     </div>

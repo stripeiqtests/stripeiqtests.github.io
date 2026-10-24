@@ -91,6 +91,7 @@ const translations = {
 
         // Admin Panel
         'admin.panel': 'Панель администратора',
+        'admin.settings': 'Настройки',
         'admin.login': 'Вход в админ-панель',
         'admin.password': 'Пароль',
         'admin.enter': 'Войти',
@@ -226,6 +227,7 @@ const translations = {
 
         // Admin Panel
         'admin.panel': 'Admin Panel',
+        'admin.settings': 'Settings',
         'admin.login': 'Admin Login',
         'admin.password': 'Password',
         'admin.enter': 'Enter',
@@ -296,74 +298,74 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
     // Load language mode from database on mount
     useEffect(() => {
+        let active=true;
         async function loadLanguageMode() {
             try {
                 const { data } = await supabase
                     .from('app_settings')
                     .select('value')
                     .eq('key', 'language_mode')
+                    .retry(false)
+                    .abortSignal(AbortSignal.timeout(8000))
                     .single();
 
-                const mode = (data?.value as LanguageMode) || 'ru';
+                if(!active)return;
+                const value = data?.value;
+                const mode: LanguageMode = value === 'ru' || value === 'en' || value === 'bilingual' ? value : 'ru';
                 setLanguageModeState(mode);
 
                 // Set language based on mode
                 if (mode === 'bilingual') {
                     // In bilingual mode, respect user's saved preference
-                    const saved = localStorage.getItem('lang');
+                    let saved:string|null=null;
+                    try {saved=localStorage.getItem('lang');}catch{/* Optional preference. */}
                     setLangState((saved === 'en' || saved === 'ru') ? saved : 'ru');
                 } else {
                     // In single-language mode, force that language
                     setLangState(mode);
-                    localStorage.setItem('lang', mode);
+                    try{localStorage.setItem('lang',mode);}catch{/* The configured language still applies. */}
                 }
             } catch (error) {
                 console.error('Error loading language mode:', error);
                 // Default to Russian
-                setLangState('ru');
+                if(active)setLangState('ru');
             } finally {
-                setLanguageModeLoading(false);
+                if(active)setLanguageModeLoading(false);
             }
         }
 
         loadLanguageMode();
+        return ()=>{active=false;};
     }, []);
 
     const setLang = (newLang: Language) => {
         // Only allow switching in bilingual mode
         if (languageMode === 'bilingual') {
             setLangState(newLang);
-            localStorage.setItem('lang', newLang);
+            try { localStorage.setItem('lang', newLang); } catch { /* Optional preference. */ }
         }
     };
 
     const setLanguageMode = async (mode: LanguageMode) => {
         try {
-            // Update in database
-            const { error: updateError } = await supabase
-                .from('app_settings')
-                .update({ value: mode })
-                .eq('key', 'language_mode');
-
-            if (updateError) {
-                // Try insert if update fails
-                await supabase
-                    .from('app_settings')
-                    .insert({ key: 'language_mode', value: mode });
-            }
+            const { error } = await supabase.from('app_settings')
+                .upsert({ key: 'language_mode', value: mode }, { onConflict: 'key' });
+            if (error) throw error;
 
             setLanguageModeState(mode);
 
             // Update current language based on new mode
             if (mode !== 'bilingual') {
                 setLangState(mode);
-                localStorage.setItem('lang', mode);
+                try { localStorage.setItem('lang', mode); } catch { /* Optional preference. */ }
             }
         } catch (error) {
             console.error('Error saving language mode:', error);
             throw error;
         }
     };
+
+    useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
     const t = (key: string): string => {
         return translations[lang][key as keyof typeof translations['ru']] || key;
@@ -396,12 +398,18 @@ export function LanguageSwitcher() {
     return (
         <div className="language-switcher">
             <button
+                type="button"
+                aria-pressed={lang==='ru'}
+                aria-label="RU (Русский)"
                 className={`lang-btn ${lang === 'ru' ? 'active' : ''}`}
                 onClick={() => setLang('ru')}
             >
                 RU
             </button>
             <button
+                type="button"
+                aria-pressed={lang==='en'}
+                aria-label="EN (English)"
                 className={`lang-btn ${lang === 'en' ? 'active' : ''}`}
                 onClick={() => setLang('en')}
             >

@@ -1,0 +1,11 @@
+{
+  "version": "5",
+  "specifiers": {
+    "npm:stripe@23.0.0": "23.0.0"
+  },
+  "npm": {
+    "stripe@23.0.0": {
+      "integrity": "sha512-MDE2A5ZVVluYURORaZEVghSmnLJc3w6aHAlZSxDQMsOjOb3V0O6ro/CiaeFlJS4N7uIVmsg98ocRsPmUK6YfyA=="
+    }
+  }
+}

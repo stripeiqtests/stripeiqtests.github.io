@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-23",
+  "project": "afsoyuczexiztsjntkvi",
+  "production_monitor_updated": true,
+  "production_frontend_or_functions_changed": false,
+  "private_credentials_used_by_monitor": false,
+  "remote_tests_passed": 12,
+  "local_tests_passed": 12,
+  "sha256": {
+    "healthcheck.py": "5b56da748f9b3a83c8222995c55e911338588b8179bb4956948ce633d543e8b4",
+    "inner-code-health.service": "53c4f37d3f59409c3ed06c1b5db6f8411f6fb9c7005fb73b0fb547811d96bc96"
+  },
+  "rollback_files": "/opt/inner-code-health/releases/audit-20261023-0613/healthcheck.before.py and inner-code-health.before.service",
+  "first_live_systemd_result": "success",
+  "first_live_exit_status": 0,
+  "last_success_at": "2026-10-23T06:13:21.857643+00:00",
+  "freshness_verified_at": "2026-10-23T06:14:08.893270+00:00",
+  "freshness_result": "ok",
+  "checks": ["active_test_database_read", "homepage", "question_illustration", "storage_listing"],
+  "skipped_checks": [{"check": "storage_object_download", "reason": "bucket_empty"}],
+  "schedule": "00,06,12,18:23 UTC with up to 5 minutes jitter; existing timer retained and active",
+  "limitations": [
+    "No administrator upload, private bucket or complete object inventory check",
+    "Freshness inspector requires invocation by an independent observer; no external watchdog or notification destination configured",
+    "A monitor running on the VPS cannot itself detect that the entire VPS is offline",
+    "Small real database reads reduce inactivity risk; they do not guarantee free-plan availability"
+  ]
+}

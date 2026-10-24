@@ -1,0 +1,20 @@
+{
+  "project": "afsoyuczexiztsjntkvi",
+  "migration": "20261022200000_payment_fulfillment.sql",
+  "source_sha256_at_execution": "486e21dbce05869d08ea70c283939d841399d05e5184b76844a9122ff70fae7b",
+  "authorization": "Explicit user approval in this chat before execution",
+  "execution": "Supabase SQL Editor: Success. No rows returned",
+  "read_only_checks": {
+    "private_tables_have_rls": true,
+    "public_cannot_read_payment_state": true,
+    "seven_private_rpcs_are_service_only": true,
+    "wrong_capability_cannot_read_result_context": true,
+    "owned_context_remains_available": true,
+    "unpaid_answers_and_all_five_scores_remain_hidden": true,
+    "patch_created_no_orders_or_email_jobs": true
+  },
+  "edge_functions_deployed": false,
+  "stripe_webhook_configured": false,
+  "private_email_scheduler_configured": false,
+  "frontend_released": false
+}

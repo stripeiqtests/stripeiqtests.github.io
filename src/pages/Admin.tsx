@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { generateSlug } from '../lib/utils';
 import type { Test, Question } from '../lib/supabase';
@@ -13,15 +13,22 @@ import { AdminPagesDashboard } from '../components/AdminPagesDashboard';
 import { AdminArchetypesTab } from '../components/AdminArchetypesTab';
 import { AdminSettingsTab } from '../components/AdminSettingsTab';
 import { useLanguage, LanguageSwitcher } from '../lib/i18n';
+import { parseOptions, validPrice, nextQuestionNumber } from '../lib/testData';
+import {validateQuestionImage,ImageValidationError} from '../lib/questionUpload';
 
 export function Admin() {
   const { isAdmin, authLoading, login, logout } = useAdmin();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const [actionError, setActionError] = useState('');
+  const [pendingAction, setPendingAction] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const actionLock = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const passwordDialog=useRef<HTMLDialogElement|null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordUpdateError, setPasswordUpdateError] = useState('');
@@ -71,14 +78,15 @@ export function Admin() {
       .select('*')
       .order('created_at', { ascending: false });
 
+    if (error) setActionError(lang === 'ru' ? 'Не удалось загрузить тесты. Обновите страницу.' : 'Could not load tests. Please reload.');
     if (!error && data) {
       setTests(data);
     }
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     if (isAdmin) {
-      // Data is loaded asynchronously; the state update occurs after the request.
+      // All state updates inside this callback follow the awaited HTTP response.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void loadTests();
     }
@@ -141,38 +149,52 @@ export function Admin() {
 
   useEffect(() => {
     if (isAdmin && activeTab === 'tests' && expandedTestId && !questions[expandedTestId]) {
-      // The request updates questions asynchronously after the response.
+      // All state updates inside this callback follow the awaited HTTP response.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void loadQuestions(expandedTestId);
     }
   }, [isAdmin, activeTab, expandedTestId, questions, loadQuestions]);
 
   async function toggleTestActive(test: Test) {
+    if (test.archived_at) return;
+    await runAction(async () => {
     const { error } = await supabase
       .from('tests')
       .update({ is_active: !test.is_active })
       .eq('id', test.id);
 
-    if (!error) {
-      loadTests();
-    }
+    if (error) throw error;
+    await loadTests();
+    });
+  }
+
+  async function runAction(action: () => Promise<void>) {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setPendingAction(true); setActionError('');
+    try { await action(); }
+    catch (error) { setActionError(saveErrorMessage(error, lang)); }
+    finally { actionLock.current = false; setPendingAction(false); }
   }
 
   async function saveTest(test: Partial<Test>) {
-    const slug = generateSlug(test.title || '');
+    const title = test.title?.trim() ?? '';
+    if (!title || !validPrice(test.price_cents)) throw new Error(lang === 'ru' ? 'Укажите название и цену от $0.50 до $1000.' : 'Enter a title and a price between $0.50 and $1000.');
+    const slug = generateSlug(title);
+    if (!test.id && !slug) throw new Error(lang === 'ru' ? 'Название должно содержать буквы или цифры.' : 'The title must contain letters or numbers.');
 
     if (test.id) {
       // Update existing
       const { error } = await supabase
         .from('tests')
         .update({
-          title: test.title,
-          slug: slug,
+          title,
           description: test.description,
           price_cents: test.price_cents,
         })
         .eq('id', test.id);
 
+      if (error) throw error;
       if (!error) {
         setEditingTest(null);
         loadTests();
@@ -182,13 +204,14 @@ export function Admin() {
       const { error } = await supabase
         .from('tests')
         .insert({
-          title: test.title,
+          title,
           slug: slug,
           description: test.description,
           price_cents: test.price_cents,
           is_active: false,
         });
 
+      if (error) throw error;
       if (!error) {
         setNewTest(false);
         loadTests();
@@ -196,27 +219,33 @@ export function Admin() {
     }
   }
 
-  async function deleteTest(testId: string) {
-    if (!confirm('Are you sure? This will delete all questions in this test.')) return;
-
-    // Delete questions first
-    await supabase.from('questions').delete().eq('test_id', testId);
-    // Then delete test
-    const { error } = await supabase.from('tests').delete().eq('id', testId);
-
-    if (!error) {
-      loadTests();
-    }
+  async function archiveTest(test: Test) {
+    const restore = Boolean(test.archived_at);
+    if (!restore && !confirm(lang === 'ru' ? 'Архивировать тест? Вопросы и результаты сохранятся; начать новую попытку будет нельзя.' : 'Archive this test? Questions and results are kept; new attempts will be unavailable.')) return;
+    await runAction(async () => {
+      const { error } = await supabase.from('tests')
+        .update({ archived_at: restore ? null : new Date().toISOString(), is_active: false }).eq('id', test.id);
+      if (error) throw error;
+      await loadTests();
+    });
   }
 
   async function saveQuestion(question: Partial<Question>, testId: string) {
+    if (!question.question_text?.trim() || !Number.isInteger(question.question_number) || (question.question_number ?? 0) < 1) {
+      throw new Error(lang === 'ru' ? 'Введите текст и положительный целый номер вопроса.' : 'Enter question text and a positive whole question number.');
+    }
+    let parsed;
+    try { parsed = parseOptions(question.options); }
+    catch { throw new Error(lang === 'ru' ? 'Заполните все варианты ответа. Обозначения должны быть уникальны.' : 'Fill every answer option. Labels must be unique.'); }
+    if (!parsed.some(option => option.label === question.correct_answer)) throw new Error(lang === 'ru' ? 'Выберите правильный ответ из вариантов.' : 'Select a correct answer from the options.');
+    if ((questions[testId] ?? []).some(q => q.id !== question.id && q.question_number === question.question_number)) throw new Error(lang === 'ru' ? 'Вопрос с таким номером уже есть.' : 'This question number is already in use.');
     if (question.id) {
       // Update existing
       const { error } = await supabase
         .from('questions')
         .update({
           question_number: question.question_number,
-          question_text: question.question_text,
+          question_text: question.question_text.trim(),
           image_url: question.image_url,
           options: question.options,
           correct_answer: question.correct_answer,
@@ -224,6 +253,7 @@ export function Admin() {
         })
         .eq('id', question.id);
 
+      if (error) throw error;
       if (!error) {
         setEditingQuestion(null);
         loadQuestions(testId);
@@ -235,13 +265,14 @@ export function Admin() {
         .insert({
           test_id: testId,
           question_number: question.question_number,
-          question_text: question.question_text,
+          question_text: question.question_text.trim(),
           image_url: question.image_url,
           options: question.options,
           correct_answer: question.correct_answer,
           dimension: question.dimension,
         });
 
+      if (error) throw error;
       if (!error) {
         setNewQuestion(null);
         loadQuestions(testId);
@@ -250,13 +281,13 @@ export function Admin() {
   }
 
   async function deleteQuestion(questionId: string, testId: string) {
-    if (!confirm('Delete this question?')) return;
+    if (!confirm(lang === 'ru' ? 'Удалить этот вопрос?' : 'Delete this question?')) return;
 
+    await runAction(async () => {
     const { error } = await supabase.from('questions').delete().eq('id', questionId);
-
-    if (!error) {
-      loadQuestions(testId);
-    }
+    if (error) throw error;
+    await loadQuestions(testId);
+    });
   }
 
   function handleExpandTest(testId: string) {
@@ -278,7 +309,7 @@ export function Admin() {
   // Login form
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div role="main" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-8">
             <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -338,12 +369,12 @@ export function Admin() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <Link to="/" className="text-gray-500 hover:text-gray-700">
+            <Link to="/" aria-label={t('admin.back_home')} className="text-gray-500 hover:text-gray-700">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div className="flex items-center gap-2">
               <Brain className="w-6 h-6 text-indigo-600" />
-              <span className="font-bold text-gray-900">{t('admin.panel')}</span>
+              <h1 className="font-bold text-gray-900">{t('admin.panel')}</h1>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -372,12 +403,12 @@ export function Admin() {
       </header>
 
       {showPasswordDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
+          <dialog
+            ref={node=>{passwordDialog.current=node;if(node&&!node.open)node.showModal();}}
             aria-labelledby="password-dialog-title"
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            onClose={()=>setShowPasswordDialog(false)}
+            onCancel={event=>{if(passwordUpdating)event.preventDefault();}}
+            className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl bg-white p-6 shadow-xl backdrop:bg-black/40"
           >
             <div className="mb-5 flex items-center justify-between gap-4">
               <h2 id="password-dialog-title" className="text-xl font-semibold text-gray-900">
@@ -386,8 +417,9 @@ export function Admin() {
               <button
                 type="button"
                 aria-label={t('admin.cancel')}
-                onClick={() => setShowPasswordDialog(false)}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                disabled={passwordUpdating}
+                onClick={() => passwordDialog.current?.close()}
+                className="rounded-lg p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-800"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -396,6 +428,7 @@ export function Admin() {
             <form onSubmit={handlePasswordUpdate} className="space-y-4">
               <input
                 type="password"
+                aria-label={t('admin.new_password')}
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
                 placeholder={t('admin.new_password')}
@@ -405,6 +438,7 @@ export function Admin() {
               />
               <input
                 type="password"
+                aria-label={t('admin.confirm_password')}
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 placeholder={t('admin.confirm_password')}
@@ -422,7 +456,8 @@ export function Admin() {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowPasswordDialog(false)}
+                  disabled={passwordUpdating}
+                  onClick={() => passwordDialog.current?.close()}
                   className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
                 >
                   {t('admin.cancel')}
@@ -436,8 +471,7 @@ export function Admin() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+          </dialog>
       )}
 
       <main className="max-w-6xl mx-auto px-4 py-8">
@@ -505,6 +539,8 @@ export function Admin() {
         {/* Tests Tab */}
         {activeTab === 'tests' && (
           <>
+            {actionError && <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">{actionError}</p>}
+            <label className="mb-4 flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} />{lang === 'ru' ? 'Показать архив' : 'Show archived tests'}</label>
             {/* Tests Section */}
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-900">{t('admin.manage_tests')}</h2>
@@ -527,7 +563,7 @@ export function Admin() {
 
             {/* Tests List */}
             <div className="space-y-4">
-              {tests.map((test) => (
+              {tests.filter(test => showArchived || !test.archived_at).map((test) => (
                 <div key={test.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                   {/* Test Header */}
                   {editingTestId === test.id ? (
@@ -556,6 +592,7 @@ export function Admin() {
                         </div>
                         <div className="flex items-center gap-2">
                           <button
+                            disabled={pendingAction || Boolean(test.archived_at)}
                             onClick={() => toggleTestActive(test)}
                             className={`p-2 rounded-lg transition-colors ${test.is_active
                               ? 'text-green-600 hover:bg-green-50'
@@ -567,17 +604,18 @@ export function Admin() {
                           </button>
                           <button
                             onClick={() => setEditingTest(test.id)}
-                            className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="p-2 text-gray-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
                             title={t('admin.edit')}
                           >
                             <Edit2 className="w-5 h-5" />
                           </button>
                           <button
-                            onClick={() => deleteTest(test.id)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title={t('admin.delete')}
+                            disabled={pendingAction}
+                            onClick={() => archiveTest(test)}
+                            className="p-2 text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                            title={test.archived_at ? (lang === 'ru' ? 'Восстановить из архива' : 'Restore from archive') : (lang === 'ru' ? 'Архивировать тест' : 'Archive test')}
                           >
-                            <Trash2 className="w-5 h-5" />
+                            <span className="text-xs font-medium">{test.archived_at ? (lang === 'ru' ? 'Вернуть' : 'Restore') : (lang === 'ru' ? 'В архив' : 'Archive')}</span>
                           </button>
                           <button
                             onClick={() => handleExpandTest(test.id)}
@@ -614,7 +652,7 @@ export function Admin() {
                       {/* New Question Form */}
                       {newQuestion === test.id && (
                         <QuestionForm
-                          questionNumber={(questions[test.id]?.length || 0) + 1}
+                          questionNumber={nextQuestionNumber(questions[test.id] ?? [])}
                           onSave={(q) => saveQuestion(q, test.id)}
                           onCancel={() => setNewQuestion(null)}
                         />
@@ -705,16 +743,26 @@ function TestForm({
   onCancel
 }: {
   test?: Test;
-  onSave: (test: Partial<Test>) => void;
+  onSave: (test: Partial<Test>) => Promise<void>;
   onCancel: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const saveLock = useRef(false);
   const [title, setTitle] = useState(test?.title || '');
   const [description, setDescription] = useState(test?.description || '');
   const [price, setPrice] = useState(test ? (test.price_cents / 100).toString() : '5');
 
   return (
-    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+    <form className="bg-indigo-50 p-4 rounded-lg border border-indigo-200" onSubmit={async event => {
+      event.preventDefault(); if (saveLock.current) return;
+      saveLock.current = true; setSaving(true); setSaveError('');
+      try { await onSave({ id: test?.id, title: title.trim(), description, price_cents: Math.round(Number(price) * 100) }); }
+      catch (error) { setSaveError(saveErrorMessage(error, lang)); }
+      finally { saveLock.current = false; setSaving(false); }
+    }}>
+      <fieldset disabled={saving}>
       <div className="space-y-3">
         <input
           type="text"
@@ -739,7 +787,10 @@ function TestForm({
             type="number"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            min="0"
+            min="0.50"
+            max="1000"
+            required
+            aria-label={t('admin.price')}
             step="0.01"
             className="w-24 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
@@ -747,6 +798,7 @@ function TestForm({
       </div>
       <div className="flex justify-end gap-2 mt-4">
         <button
+          type="button"
           onClick={onCancel}
           aria-label={t('admin.cancel')}
           className="px-4 py-2 text-gray-600 hover:text-gray-800"
@@ -754,20 +806,17 @@ function TestForm({
           <X className="w-5 h-5" />
         </button>
         <button
-          onClick={() => onSave({
-            id: test?.id,
-            title,
-            description,
-            price_cents: Math.round(parseFloat(price) * 100),
-          })}
-          disabled={!title}
+          type="submit"
+          disabled={saving || !title.trim() || !validPrice(Math.round(Number(price) * 100))}
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
-          {t('admin.save')}
+          {saving ? (lang === 'ru' ? 'Сохранение…' : 'Saving…') : t('admin.save')}
         </button>
       </div>
-    </div>
+      {saveError && <p role="alert" className="mt-3 text-red-800">{saveError}</p>}
+      </fieldset>
+    </form>
   );
 }
 
@@ -780,15 +829,31 @@ function QuestionForm({
 }: {
   question?: Question;
   questionNumber: number;
-  onSave: (question: Partial<Question>) => void;
+  onSave: (question: Partial<Question>) => Promise<void>;
   onCancel: () => void;
 }) {
   const { t, lang } = useLanguage();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const saveLock = useRef(false);
   const [qNumber, setQNumber] = useState(question?.question_number || questionNumber);
   const [text, setText] = useState(question?.question_text || '');
   const [imageUrl, setImageUrl] = useState(question?.image_url || '');
   const [useUrlInput, setUseUrlInput] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadError,setUploadError]=useState('');
+  const ownUploads=useRef(new Map<string,string>());
+  const protectedUploads=useRef(new Set<string>());
+  const formMounted=useRef(true);
+  useEffect(()=>{
+    formMounted.current=true;
+    const owned=ownUploads.current,protectedPaths=protectedUploads.current;
+    return ()=>{
+      formMounted.current=false;
+      const discarded=[...owned.keys()].filter(path=>!protectedPaths.has(path));
+      if(discarded.length)void discardNewImages(discarded);
+    };
+  },[]);
   const [options, setOptions] = useState<{ label: string; value: string }[]>(() => {
     if (!question?.options) {
       return [
@@ -820,46 +885,47 @@ function QuestionForm({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert(lang === 'ru' ? 'Пожалуйста, выберите изображение' : 'Please select an image file');
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert(lang === 'ru' ? 'Файл слишком большой (макс. 5МБ)' : 'File too large (max 5MB)');
-      return;
-    }
-
+    e.target.value='';
+    setUploadError('');
     setUploading(true);
-
+    let filePath:string|null=null;
     try {
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `question_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `questions/${fileName}`;
+      const format=await validateQuestionImage(file);
+      if(!formMounted.current)return;
+      filePath=`questions/${crypto.randomUUID()}.${format.extension}`;
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('images')
-        .upload(filePath, file);
+        .upload(filePath, file,{contentType:format.contentType,upsert:false});
 
       if (uploadError) {
         throw uploadError;
       }
+
+      if(!formMounted.current){await discardNewImages([filePath]);return;}
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('images')
         .getPublicUrl(filePath);
 
+      ownUploads.current.set(filePath,publicUrl);
       setImageUrl(publicUrl);
     } catch (error) {
-      console.error('Upload error:', error);
-      alert(lang === 'ru' ? 'Ошибка загрузки' : 'Upload failed');
+      // A failed upload may have reached Storage. This unique path was never
+      // offered to the save handler; it is safe to discard if it exists.
+      if(filePath)await discardNewImages([filePath]);
+      if(formMounted.current){
+        const ru=lang==='ru';
+        const messages={format:ru?'Поддерживаются PNG, JPEG, GIF и WebP. Проверьте формат файла.':'Use a PNG, JPEG, GIF or WebP file.',
+          size:ru?'Выберите непустое изображение размером до 5 МБ.':'Choose a non-empty image up to 5 MB.',
+          decode:ru?'Не удалось прочитать изображение. Сохраните его заново и повторите загрузку.':'The image could not be decoded. Export it again and retry.',
+          dimensions:ru?'Изображение слишком большое: максимум 8000 пикселей по стороне и 40 мегапикселей.':'Use an image no larger than 8000 pixels per side and 40 megapixels.'};
+        setUploadError(error instanceof ImageValidationError?messages[error.code]:ru?'Не удалось загрузить изображение. Проверьте подключение и повторите: текст вопроса остаётся в форме.':'The image could not upload. Check your connection and retry; your question text stays in the form.');
+      }
     } finally {
-      setUploading(false);
+      if(formMounted.current)setUploading(false);
     }
   }
 
@@ -868,12 +934,27 @@ function QuestionForm({
   }
 
   return (
-    <div className="bg-white p-4 rounded-lg border border-indigo-200 mb-2">
+    <form className="bg-white p-4 rounded-lg border border-indigo-200 mb-2" onSubmit={async event => {
+      event.preventDefault(); if (saveLock.current || uploading) return;
+      saveLock.current = true; setSaving(true); setSaveError('');
+      // The parent unmounts this form after a successful write. Protect the
+      // chosen upload BEFORE awaiting it. On an ambiguous network failure keep
+      // it too: leaking a temporary file is safer than deleting a saved image.
+      for(const [path,url] of ownUploads.current)if(url===imageUrl)protectedUploads.current.add(path);
+      try { await onSave({ id: question?.id, question_number: qNumber, question_text: text.trim(), image_url: imageUrl || null, options: JSON.stringify(options), correct_answer: correctAnswer, dimension }); }
+      catch (error) { setSaveError(saveErrorMessage(error, lang)); }
+      finally { saveLock.current = false; setSaving(false); }
+    }}>
+      <fieldset disabled={saving}>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500">{t('admin.question_num')}</label>
           <input
             type="number"
+            min="1"
+            step="1"
+            required
+            aria-label={t('admin.question_num')}
             value={qNumber}
             onChange={(e) => setQNumber(parseInt(e.target.value))}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
@@ -882,6 +963,7 @@ function QuestionForm({
         <div>
           <label className="text-xs text-gray-500">{t('admin.dimension')}</label>
           <select
+            aria-label={t('admin.dimension')}
             value={dimension}
             onChange={(e) => setDimension(e.target.value as Question['dimension'])}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
@@ -897,6 +979,7 @@ function QuestionForm({
       <div className="mt-3">
         <label className="text-xs text-gray-500">{t('admin.question_text')}</label>
         <textarea
+          aria-label={t('admin.question_text')}
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={2}
@@ -940,6 +1023,7 @@ function QuestionForm({
             <button
               type="button"
               onClick={handleRemoveImage}
+              aria-label={lang==='ru'?'Убрать изображение':'Remove image'}
               className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
             >
               <X className="w-3 h-3" />
@@ -952,6 +1036,7 @@ function QuestionForm({
           <input
             type="text"
             value={imageUrl}
+            aria-label={t('admin.image_url')}
             onChange={(e) => setImageUrl(e.target.value)}
             placeholder="https://..."
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
@@ -959,13 +1044,14 @@ function QuestionForm({
         ) : (
           /* File Upload */
           <div className="flex items-center gap-2">
-            <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 focus-within:ring-2 focus-within:ring-indigo-600 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                aria-label={lang==='ru'?'Загрузить изображение':'Upload image'}
                 onChange={handleImageUpload}
                 disabled={uploading}
-                className="hidden"
+                className="sr-only"
               />
               {uploading ? (
                 <>
@@ -987,6 +1073,9 @@ function QuestionForm({
         )}
       </div>
 
+      {uploadError&&<p role="alert" className="mt-2 text-sm text-red-800">{uploadError}</p>}
+      <p className="mt-2 text-xs text-gray-600">{lang==='ru'?'PNG, JPEG, GIF или WebP; до 5 МБ, 8000 пикселей по стороне и 40 Мп.':'PNG, JPEG, GIF or WebP; up to 5 MB, 8000 pixels per side and 40 MP.'}</p>
+
       <div className="mt-3">
         <label className="text-xs text-gray-500">{t('admin.options')}</label>
         <div className="space-y-2">
@@ -995,6 +1084,7 @@ function QuestionForm({
               <span className="text-sm font-medium w-6">{opt.label}:</span>
               <input
                 type="text"
+                aria-label={`${t('admin.options')}: ${opt.label}`}
                 value={opt.value}
                 onChange={(e) => {
                   const newOptions = [...options];
@@ -1011,6 +1101,7 @@ function QuestionForm({
       <div className="mt-3">
         <label className="text-xs text-gray-500">{t('admin.correct_answer')}</label>
         <select
+          aria-label={t('admin.correct_answer')}
           value={correctAnswer}
           onChange={(e) => setCorrectAnswer(e.target.value)}
           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
@@ -1022,26 +1113,34 @@ function QuestionForm({
       </div>
 
       <div className="flex justify-end gap-2 mt-4">
-        <button onClick={onCancel} className="px-3 py-1.5 text-gray-600 hover:text-gray-800 text-sm">
+        <button type="button" disabled={uploading} onClick={onCancel} className="px-3 py-1.5 text-gray-600 hover:text-gray-800 text-sm">
           {t('admin.cancel')}
         </button>
         <button
-          onClick={() => onSave({
-            id: question?.id,
-            question_number: qNumber,
-            question_text: text,
-            image_url: imageUrl || null,
-            options: JSON.stringify(options),
-            correct_answer: correctAnswer,
-            dimension,
-          })}
-          disabled={!text}
+          type="submit"
+          disabled={saving || uploading || !text.trim() || options.some(option => !option.value.trim()) || !Number.isInteger(qNumber) || qNumber < 1}
           className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 disabled:opacity-50"
         >
           <Save className="w-3 h-3" />
-          {t('admin.save')}
+          {saving ? (lang === 'ru' ? 'Сохранение…' : 'Saving…') : t('admin.save')}
         </button>
       </div>
-    </div>
+      {saveError && <p role="alert" className="mt-3 text-red-800">{saveError}</p>}
+      </fieldset>
+    </form>
   );
+}
+
+function saveErrorMessage(error: unknown, lang: string): string {
+  const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
+  if (code === '23505') return lang === 'ru' ? 'Такой номер или адрес уже занят. Измените значение.' : 'This number or address is already in use.';
+  if (code === '42501') return lang === 'ru' ? 'Недостаточно прав. Войдите заново под администратором.' : 'Permission denied. Sign in again as an administrator.';
+  if (error instanceof Error) return error.message;
+  return lang === 'ru' ? 'Не удалось сохранить изменения. Проверьте подключение и попробуйте ещё раз.' : 'Could not save changes. Check your connection and retry.';
+}
+
+async function discardNewImages(paths:string[]) {
+  if(!paths.length||paths.some(path=>!/^questions\/[0-9a-f-]{36}\.(png|jpg|gif|webp)$/.test(path)))return;
+  try{const {error}=await supabase.storage.from('images').remove(paths);if(error)console.warn('Discarded image cleanup deferred');}
+  catch{console.warn('Discarded image cleanup deferred');}
 }

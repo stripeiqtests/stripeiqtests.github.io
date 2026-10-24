@@ -1,0 +1,20 @@
+{
+  "project": "afsoyuczexiztsjntkvi",
+  "project_name": "IQ Tests",
+  "migration": "20261022190000_audit_safety.sql",
+  "source_sha256_at_execution": "c0f027509a1cb5918841bfc9652b544f615e09ff3e5c9d31865be7c571d05223",
+  "authorization": "Explicit user approval in this chat before execution",
+  "execution": "Supabase SQL Editor: Success. No rows returned",
+  "read_only_checks": {
+    "archive_column_exists": true,
+    "archive_constraint_exists": true,
+    "support_contact_value_matches": true,
+    "support_contact_public_policy_exists": true,
+    "unpaid_answers_and_all_five_scores_hidden": true,
+    "paid_records_available_for_live_branch_verification": false,
+    "unpaid_records_available_for_live_branch_verification": true
+  },
+  "paid_branch_evidence": "Isolated PostgreSQL: paid capability returns authoritative score; wrong capability returns no row. No paid production records existed to exercise that branch live.",
+  "new_payment_migration_applied": true,
+  "frontend_released": false
+}

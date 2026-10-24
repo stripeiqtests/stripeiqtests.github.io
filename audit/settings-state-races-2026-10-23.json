@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-23",
+  "scope": "Administrator settings state reliability; no authored text changes",
+  "reproductions_before_fix": [
+    "Select unsaved follow-up target, switch RU to EN: old server value clears the draft.",
+    "Hold initial support-contact response, save a new contact, release old response: UI replaces successful save with old contact."
+  ],
+  "changes": [
+    "Follow-up setting loads once per mount, independent of UI language",
+    "Failed follow-up load cannot save an empty fallback",
+    "Follow-up editor locked during save; changing selection clears stale saved indicator",
+    "Successful support-contact save invalidates earlier read snapshot",
+    "Bounded reads/writes and cleanup of obsolete requests"
+  ],
+  "validation": {
+    "before": "Both specific reproductions failed at saved/draft value assertions",
+    "after": "27 affected settings/locale/reliability/accessibility scenarios passed; after final PromiseLike type correction and editor locking, all three targeted regression tests passed again",
+    "lint": "passed without warnings",
+    "build": "passed; existing large-main-chunk warning remains",
+    "security": "passed",
+    "rich_text": "passed",
+    "hosting": "2 passed"
+  },
+  "production_writes": "None for these regressions; the separately approved presentation migration is recorded in production-presentation-schema-2026-10-23.json."
+}
